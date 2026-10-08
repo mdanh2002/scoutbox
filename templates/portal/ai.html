@@ -1,0 +1,780 @@
+{% extends 'portal/base.html' %}{% load portal_extras %}
+{% block content %}
+{% include 'portal/_system_tabs.html' %}
+{% if not ai_readiness.ready %}<div class="notice warn ai-readiness-panel"><b>{% if ai_readiness.identifying %}Identifying local accelerator…{% else %}AI unavailable{% endif %}</b>{% if not ai_readiness.identifying %}<span> — AI actions are paused.</span>{% endif %} <button type="button" class="link-button" onclick="openModal('ai-readiness-log-modal')">Show Logs</button></div>{% endif %}
+<div class="tabs compact" data-tabs="ai"><button type="button" data-tab-button="ai" data-target="discovery">Discovery</button><button type="button" data-tab-button="ai" data-target="providers">Providers</button><button type="button" data-tab-button="ai" data-target="chatbot">Chatbot</button><button type="button" data-tab-button="ai" data-target="miscellaneous">Miscellaneous</button></div>
+
+<section id="discovery" data-tab-panel="ai">
+<div class="card full discovery-config-card"><div class="body">
+<form method="post" class="discovery-mode-row" id="discovery-mode-form">{% csrf_token %}<input type="hidden" name="action" value="save_discovery_mode"><div class="discovery-mode-select"><span class="discovery-mode-label" id="discovery-mode-heading" role="heading" aria-level="3">Discovery Method:</span><select name="discovery_mode" id="discovery-mode-select" data-current="{{discovery_mode}}" aria-labelledby="discovery-mode-heading"><option value="source_guided" {% if discovery_mode == 'source_guided' %}selected{% endif %}>Local AI Discovery — search engines find URLs; local AI analyzes them</option><option value="cloud_web" {% if discovery_mode == 'cloud_web' %}selected{% endif %}>Cloud Web — cloud AI performs discovery and AI stages automatically</option></select></div><div class="help discovery-mode-help" id="discovery-mode-status"></div></form>
+<div class="discovery-routing-block">
+{% if discovery_mode == 'source_guided' %}
+<form method="post" id="pipeline-routing-form">{% csrf_token %}
+<div class="table-scroll"><table class="table-compact pipeline-routing-table local-routing-table">
+<thead><tr><th>Stage</th><th>Primary local model</th><th>Fallback local model</th><th>Input cap</th><th>Output cap</th></tr></thead>
+<tbody>{% for stage in stages %}
+{% route_value current_routes stage as current %}
+{% route_fallback_value current_routes stage as fallback %}
+{% route_field current_routes stage 'max_input_tokens' '' as maxin %}
+{% route_field current_routes stage 'max_output_tokens' '' as maxout %}
+{% model_stage_field pipeline_model_status stage 'state' 'unknown' as model_state %}
+{% model_stage_field pipeline_model_status stage 'title' 'Not tested' as model_title %}
+{% model_stage_field pipeline_model_status stage 'result' '' as model_result %}
+{% model_stage_field pipeline_model_status stage 'primary_state' 'unknown' as primary_state %}
+{% model_stage_field pipeline_model_status stage 'primary_title' 'Not tested' as primary_title %}
+{% model_stage_field pipeline_model_status stage 'fallback_state' 'unknown' as fallback_state %}
+{% model_stage_field pipeline_model_status stage 'fallback_title' 'Not tested' as fallback_title %}
+<tr data-pipeline-stage="{{stage}}">
+<td class="pipeline-stage-cell"><span class="pipeline-stage-status {{model_state}}" title="{{model_title}}" aria-label="{{model_title}}">{% if model_state == 'ok' %}✓{% elif model_state == 'warning' %}!{% elif model_state == 'testing' %}↻{% elif model_state == 'queued' %}…{% else %}?{% endif %}</span><button type="button" class="pipeline-stage-link{% if not model_result %} untested{% endif %}" {% if model_result %}data-stage-result="{{model_result|to_json|escape}}"{% else %}disabled{% endif %}>{{stage|pipeline_stage_label}}</button></td>
+<td><div class="pipeline-route-control"><span class="pipeline-route-status {{primary_state}}" data-route-role="primary" title="{{primary_title}}" aria-label="Primary: {{primary_title}}">{% if primary_state == 'ok' %}✓{% elif primary_state == 'warning' %}!{% elif primary_state == 'testing' %}↻{% elif primary_state == 'queued' %}…{% elif primary_state == 'na' %}{% else %}?{% endif %}</span><select name="route_{{stage}}" data-route-lane="primary"><option value="">Automatic local</option>{% for m in local_model_choices %}<option value="{{m.value}}" {% if current == m.value %}selected{% endif %}>{{m.label}}</option>{% endfor %}</select></div></td>
+<td><div class="pipeline-route-control"><span class="pipeline-route-status {{fallback_state}}" data-route-role="fallback" title="{{fallback_title}}" aria-label="Fallback: {{fallback_title}}">{% if fallback_state == 'ok' %}✓{% elif fallback_state == 'warning' %}!{% elif fallback_state == 'testing' %}↻{% elif fallback_state == 'queued' %}…{% elif fallback_state == 'na' %}{% elif fallback %}?{% endif %}</span><select name="fallback_{{stage}}" data-route-lane="fallback"><option value="">No fallback</option>{% for m in local_model_choices %}<option value="{{m.value}}" {% if fallback == m.value %}selected{% endif %}>{{m.label}}</option>{% endfor %}</select></div></td>
+<td><input type="number" min="64" name="max_input_{{stage}}" value="{{maxin}}"></td>
+<td><input type="number" min="32" name="max_output_{{stage}}" value="{{maxout}}"></td>
+</tr>{% endfor %}</tbody>
+</table></div>
+<div class="section-actions pipeline-mode-actions">
+<button class="btn primary" name="action" value="save_routes" {% if pipeline_model_active_job or discovery_test_active_job %}disabled aria-busy="true"{% endif %} onclick="return confirmDiscoverySubmit(event,this,'Save these local routing and token-cap changes? They will be used by future Local AI Discovery runs.')">Save</button>
+<button type="button" class="btn" data-pipeline-preset="local" {% if pipeline_model_active_job or discovery_test_active_job %}disabled aria-busy="true"{% endif %} title="Auto-detect a hardware-aware Ollama Primary/Secondary pair for all Local AI Discovery stages" onclick="applyPipelinePreset('local')">Auto-detect</button>
+<button type="button" class="btn" {% if pipeline_model_active_job or discovery_test_active_job %}disabled aria-busy="true"{% endif %} onclick="runPipelineModelTest()">Test Selection</button>
+<button type="button" class="btn" data-discovery-test-action {% if pipeline_model_active_job or discovery_test_active_job %}aria-busy="true"{% endif %} onclick="openDiscoveryTestModal()">{% if discovery_test_active_job %}View Test Discovery{% else %}Test Discovery{% endif %}</button>
+</div>
+<div id="pipeline-model-last-test" class="pipeline-model-test-hint ai-last-tested muted"{% if pipeline_model_last_test %} data-timestamp="{% if pipeline_model_last_test.finished_at %}{{pipeline_model_last_test.finished_at|date:'d/m/Y H:i:s'}}{% else %}{{pipeline_model_last_test.created_at|date:'d/m/Y H:i:s'}}{% endif %}"{% endif %}>{% if pipeline_model_last_test %}Last tested: {% if pipeline_model_last_test.finished_at %}{{pipeline_model_last_test.finished_at|date:'d/m/Y H:i:s'}}{% else %}{{pipeline_model_last_test.created_at|date:'d/m/Y H:i:s'}}{% endif %}{% if not pipeline_model_test_current %} · selection changed; retest required{% endif %}{% else %}Last tested: not run yet{% endif %}</div>
+<div id="discovery-active-test-status" class="pipeline-model-test-hint discovery-live-test-status muted"></div><div id="pipeline-model-test-result" class="inline-result"></div>
+</form>
+{% else %}
+<form id="cloud-selection-form" method="post">{% csrf_token %}<input type="hidden" name="action" value="save_cloud_selection">
+<div class="table-scroll"><table class="table-compact pipeline-routing-table cloud-routing-table">
+<thead><tr><th>Stage</th><th>Provider</th><th>Primary model</th><th>Failover model</th><th>Input cap</th><th>Output cap</th></tr></thead>
+<tbody>{% for stage in stages %}
+{% route_field cloud_stage_routes stage 'provider' '' as cprovider %}
+{% route_field cloud_stage_routes stage 'model' '' as cprimary %}
+{% route_field cloud_stage_routes stage 'fallback_model' '' as csecondary %}
+{% route_field cloud_stage_routes stage 'max_input_tokens' '' as cmaxin %}
+{% route_field cloud_stage_routes stage 'max_output_tokens' '' as cmaxout %}
+{% model_stage_field pipeline_model_status stage 'state' 'unknown' as model_state %}
+{% model_stage_field pipeline_model_status stage 'title' 'Not tested' as model_title %}
+{% model_stage_field pipeline_model_status stage 'result' '' as model_result %}
+{% model_stage_field pipeline_model_status stage 'primary_state' 'unknown' as primary_state %}
+{% model_stage_field pipeline_model_status stage 'primary_title' 'Not tested' as primary_title %}
+{% model_stage_field pipeline_model_status stage 'fallback_state' 'unknown' as fallback_state %}
+{% model_stage_field pipeline_model_status stage 'fallback_title' 'Not tested' as fallback_title %}
+<tr data-cloud-stage="{{stage}}" data-pipeline-stage="{{stage}}">
+<td class="pipeline-stage-cell"><span class="pipeline-stage-status {{model_state}}" title="{{model_title}}" aria-label="{{model_title}}">{% if model_state == 'ok' %}✓{% elif model_state == 'warning' %}!{% elif model_state == 'testing' %}↻{% elif model_state == 'queued' %}…{% else %}?{% endif %}</span><button type="button" class="pipeline-stage-link{% if not model_result %} untested{% endif %}" {% if model_result %}data-stage-result="{{model_result|to_json|escape}}"{% else %}disabled{% endif %}>{{stage|pipeline_stage_label}}</button></td>
+<td><select name="cloud_provider_{{stage}}" class="cloud-stage-provider" aria-label="{{stage|pipeline_stage_label}} provider">{% for cfg in cloud_providers %}<option value="{{cfg.provider}}" {% if cprovider == cfg.provider %}selected{% endif %}>{{cfg.get_provider_display}}</option>{% empty %}<option value="">No enabled Cloud provider</option>{% endfor %}</select></td>
+<td><div class="pipeline-route-control"><span class="pipeline-route-status {{primary_state}}" data-route-role="primary" title="{{primary_title}}" aria-label="Primary: {{primary_title}}">{% if primary_state == 'ok' %}✓{% elif primary_state == 'warning' %}!{% elif primary_state == 'testing' %}↻{% elif primary_state == 'queued' %}…{% else %}?{% endif %}</span><select name="cloud_primary_{{stage}}" class="cloud-stage-model cloud-stage-primary" data-current="{{cprimary}}" aria-label="{{stage|pipeline_stage_label}} primary model">{% if cprimary %}<option value="{{cprimary}}" selected>{{cprimary}}</option>{% else %}<option value="">Auto-detect or choose…</option>{% endif %}</select></div></td>
+<td><div class="pipeline-route-control"><span class="pipeline-route-status {{fallback_state}}" data-route-role="fallback" title="{{fallback_title}}" aria-label="Failover: {{fallback_title}}">{% if fallback_state == 'ok' %}✓{% elif fallback_state == 'warning' %}!{% elif fallback_state == 'testing' %}↻{% elif fallback_state == 'queued' %}…{% else %}?{% endif %}</span><select name="cloud_secondary_{{stage}}" class="cloud-stage-model cloud-stage-secondary" data-current="{{csecondary}}" aria-label="{{stage|pipeline_stage_label}} failover model">{% if csecondary %}<option value="{{csecondary}}" selected>{{csecondary}}</option>{% else %}<option value="">Auto-detect or choose…</option>{% endif %}</select></div></td>
+<td><input type="number" min="64" name="cloud_max_input_{{stage}}" value="{{cmaxin}}"></td>
+<td><input type="number" min="32" name="cloud_max_output_{{stage}}" value="{{cmaxout}}"></td>
+</tr>{% endfor %}</tbody>
+</table></div>
+{% if not cloud_available %}<div class="notice warn" id="cloud-selection-warning">Cloud Web remains selected, but one or more stages do not yet have a usable Cloud provider/model pair.</div>{% endif %}
+<div class="section-actions cloud-discovery-actions">
+  <button type="submit" class="btn primary" id="cloud-selection-save">Save</button>
+  <button type="button" class="btn" id="cloud-selection-auto" onclick="openCloudAutoDetectModal()">Auto-detect</button>
+  <button type="button" class="btn" id="cloud-selection-test" onclick="testCloudSelection()">Test Selection</button>
+  <button type="button" class="btn" data-discovery-test-action {% if discovery_test_active_job %}aria-busy="true"{% endif %} onclick="openDiscoveryTestModal()">{% if discovery_test_active_job %}View Test Discovery{% else %}Test Discovery{% endif %}</button>
+</div>
+<div id="pipeline-model-last-test" class="pipeline-model-test-hint ai-last-tested muted"{% if pipeline_model_last_test %} data-timestamp="{% if pipeline_model_last_test.finished_at %}{{pipeline_model_last_test.finished_at|date:'d/m/Y H:i:s'}}{% else %}{{pipeline_model_last_test.created_at|date:'d/m/Y H:i:s'}}{% endif %}"{% endif %}>{% if pipeline_model_last_test %}Last tested: {% if pipeline_model_last_test.finished_at %}{{pipeline_model_last_test.finished_at|date:'d/m/Y H:i:s'}}{% else %}{{pipeline_model_last_test.created_at|date:'d/m/Y H:i:s'}}{% endif %}{% if not pipeline_model_test_current %} · selection changed; retest required{% endif %}{% else %}Last tested: not run yet{% endif %}</div>
+<div id="discovery-active-test-status" class="pipeline-model-test-hint discovery-live-test-status muted"></div><div id="cloud-selection-result" class="inline-result"></div>
+</form>
+{% endif %}
+</div>
+</div></div>
+</section>
+
+<section id="providers" data-tab-panel="ai" hidden>
+<div class="card full provider-config-card"><div class="body">
+<form id="provider-config-form" class="provider-config-form" onsubmit="saveProviderConfiguration(event)">{% csrf_token %}
+<div class="provider-list">{% for cfg in configs %}
+<section class="provider-config-row" data-provider-row="{{cfg.provider}}">
+  <div class="provider-config-head"><label class="provider-enabled"><input type="checkbox" name="enabled_{{cfg.provider}}" value="1" {% if cfg.enabled %}checked{% endif %}> <b>{{cfg.get_provider_display}}</b></label>{% if cfg.last_test_at %}<span class="tag provider-last-test {% if cfg.last_test_ok %}green{% else %}red{% endif %}" title="{{cfg.last_test_message}}">Last tested {{cfg.last_test_at|date:'d/m/Y H:i'}}</span>{% endif %}</div>
+  {% if cfg.provider == 'ollama' %}<div class="provider-installed"><span class="provider-field-label">Installed models</span><div class="provider-model-line" data-provider-model-tags="ollama">{% for m in diagnostics.installed %}<span class="chip">{{m.name|default:m.model}}</span>{% empty %}<span class="muted">No models detected</span>{% endfor %}</div></div>{% endif %}
+  {% if cfg.provider != 'ollama' %}
+  <div class="provider-config-grid provider-config-first-row">
+    <div class="provider-field provider-api-key-field"><label>API key</label><input type="password" name="api_key_{{cfg.provider}}" data-provider-api-key="{{cfg.provider}}" autocomplete="new-password" placeholder="{% if cfg.api_key_enc %}Saved key — leave blank to keep{% else %}Enter API key{% endif %}"></div>
+    <div class="provider-field provider-base-url-field"><label>Base URL</label><input name="base_url_{{cfg.provider}}" data-provider-base-url="{{cfg.provider}}" value="{{cfg.base_url}}"></div>
+  </div>
+  <div class="provider-config-grid provider-config-second-row">
+    <div class="provider-field provider-default-model-field"><label>Default model</label><select name="default_model_{{cfg.provider}}" data-provider-model="{{cfg.provider}}"><option value="">Automatic</option>{% if cfg.default_model %}<option value="{{cfg.default_model}}" selected>{{cfg.default_model}}</option>{% endif %}</select></div>
+    <div class="provider-field provider-token-cap"><label>Output token cap</label><input type="number" min="64" max="8192" name="max_output_tokens_{{cfg.provider}}" data-provider-token-cap="{{cfg.provider}}" value="{{cfg.max_output_tokens|default:8000}}"></div>
+    <div class="provider-test-action"><button type="button" class="btn" data-provider-test="{{cfg.provider}}" onclick="testProviderConfiguration('{{cfg.provider|escapejs}}',this)">Test configuration</button></div>
+  </div>
+  {% else %}
+  <div class="provider-config-grid provider-config-ollama-row">
+    <div class="provider-field provider-base-url-field"><label>Base URL</label><input name="base_url_{{cfg.provider}}" data-provider-base-url="{{cfg.provider}}" value="{{cfg.base_url}}"></div>
+    <div class="provider-field provider-default-model-field"><label>Default model</label><select name="default_model_{{cfg.provider}}" data-provider-model="{{cfg.provider}}"><option value="">Automatic</option>{% if cfg.default_model %}<option value="{{cfg.default_model}}" selected>{{cfg.default_model}}</option>{% endif %}{% for m in local_model_choices %}{% if m.model != cfg.default_model %}<option value="{{m.model}}">{{m.model}}</option>{% endif %}{% endfor %}</select></div>
+    <div class="provider-test-action"><button type="button" class="btn" data-provider-test="{{cfg.provider}}" onclick="testProviderConfiguration('{{cfg.provider|escapejs}}',this)">Test configuration</button></div>
+    </div>
+  {% endif %}
+</section>{% endfor %}</div>
+<div class="provider-central-save"><button type="submit" class="btn primary" id="provider-save-button">Save Provider Configuration</button><span id="provider-save-result" class="inline-result muted"></span></div>
+</form></div></div>
+</section>
+
+<section id="chatbot" data-tab-panel="ai" hidden><div class="card full"><div class="body"><form method="post" id="chatbot-config-form">{% csrf_token %}<input type="hidden" name="action" value="save_chatbot">
+
+<div class="chatbot-flat-config">
+  <div class="form-row"><label>Primary provider</label><select name="chatbot_provider" id="chatbot-provider">{% for cfg in configs %}{% if cfg.enabled %}<option value="{{cfg.provider}}" {% if chatbot_summary.provider == cfg.provider %}selected{% endif %}>{{cfg.get_provider_display}}</option>{% endif %}{% endfor %}</select></div>
+  <div class="form-row"><label>Primary model</label><div class="chatbot-model-config-field"><div class="chatbot-model-select-status"><select name="chatbot_model_name" id="chatbot-model" data-current="{{chatbot_summary.model}}" data-current-provider="{{chatbot_summary.provider}}" required>{% if chatbot_summary.model %}<option value="{{chatbot_summary.model}}" selected>{{chatbot_summary.model}}</option>{% else %}<option value="">Select provider first…</option>{% endif %}</select><span id="chatbot-primary-test-status" class="chatbot-route-test-status {{chatbot_test_status.primary.state}}" title="{{chatbot_test_status.primary.title}}" aria-label="Primary: {{chatbot_test_status.primary.title}}">{% if chatbot_test_status.primary.state == 'ok' %}✓{% elif chatbot_test_status.primary.state == 'warning' %}!{% elif chatbot_test_status.primary.state == 'testing' %}↻{% else %}?{% endif %}</span></div><span class="help" id="chatbot-model-status"></span></div></div>
+  <div class="form-row chatbot-internet-row" id="chatbot-internet-search-row" {% if not chatbot_summary.is_cloud %}hidden{% endif %}><label></label><label class="inline-check"><input type="checkbox" name="chatbot_allow_internet_search" id="chatbot-allow-internet-search" {% if chatbot_summary.allow_internet_search %}checked{% endif %}> Allow internet research for primary</label></div>
+  <div class="form-row"><label>Secondary provider</label><select name="chatbot_secondary_provider" id="chatbot-secondary-provider">{% for cfg in configs %}{% if cfg.enabled %}<option value="{{cfg.provider}}" {% if chatbot_summary.secondary_provider == cfg.provider %}selected{% endif %}>{{cfg.get_provider_display}}</option>{% endif %}{% endfor %}</select></div>
+  <div class="form-row"><label>Secondary model</label><div class="chatbot-model-config-field"><div class="chatbot-model-select-status"><select name="chatbot_secondary_model_name" id="chatbot-secondary-model" data-current="{{chatbot_summary.secondary_model}}" data-current-provider="{{chatbot_summary.secondary_provider}}" required>{% if chatbot_summary.secondary_model %}<option value="{{chatbot_summary.secondary_model}}" selected>{{chatbot_summary.secondary_model}}</option>{% else %}<option value="">Select provider first…</option>{% endif %}</select><span id="chatbot-secondary-test-status" class="chatbot-route-test-status {{chatbot_test_status.secondary.state}}" title="{{chatbot_test_status.secondary.title}}" aria-label="Secondary: {{chatbot_test_status.secondary.title}}">{% if chatbot_test_status.secondary.state == 'ok' %}✓{% elif chatbot_test_status.secondary.state == 'warning' %}!{% elif chatbot_test_status.secondary.state == 'testing' %}↻{% else %}?{% endif %}</span></div><span class="help" id="chatbot-secondary-model-status"></span></div></div>
+  <div class="form-row chatbot-internet-row" id="chatbot-secondary-internet-search-row" {% if not chatbot_summary.secondary_is_cloud %}hidden{% endif %}><label></label><label class="inline-check"><input type="checkbox" name="chatbot_secondary_allow_internet_search" id="chatbot-secondary-allow-internet-search" {% if chatbot_summary.secondary_allow_internet_search %}checked{% endif %}> Allow internet research for secondary</label></div>
+  <div class="form-row chatbot-token-cap-row"><label>Answer token cap</label><input type="number" min="64" max="20000" name="chatbot_token_cap" value="{{chatbot_summary.max_output_tokens|default:5000}}"></div>
+</div>
+<div class="section-actions chatbot-actions"><button class="btn primary" type="submit" id="save-chatbot-button">Save config</button><button class="btn" type="button" id="chatbot-auto-select" onclick="openChatbotAutoSelectModal()">Auto-detect</button><button class="btn" type="button" id="test-chatbot-selection-button" onclick="testChatbotSelection()">Test Selection</button></div>
+<div id="chatbot-last-tested" class="ai-last-tested muted" data-primary-tested="{{chatbot_test_status.primary.tested_at}}" data-secondary-tested="{{chatbot_test_status.secondary.tested_at}}">Last tested: Primary {% if chatbot_test_status.primary.tested_at %}{{chatbot_test_status.primary.tested_at}}{% else %}not run{% endif %} · Secondary {% if chatbot_test_status.secondary.tested_at %}{{chatbot_test_status.secondary.tested_at}}{% else %}not run{% endif %}</div>
+<div class="help" id="chatbot-auto-status"></div>
+</form></div></div></section>
+
+<section id="miscellaneous" data-tab-panel="ai" hidden>
+<div class="card full"><div class="body"><form method="post" class="ai-timeout-form">{% csrf_token %}
+<div class="ai-timeout-fields">
+  <div class="form-row"><label for="local-ai-request-timeout">Local AI request timeout</label><div class="inline"><input id="local-ai-request-timeout" type="number" name="local_ai_request_timeout_seconds" min="{{ai_timeouts.local.min}}" max="{{ai_timeouts.local.max}}" step="1" value="{{ai_timeouts.local.value}}" required><span class="help">seconds</span></div></div>
+  <div class="form-row"><label for="cloud-ai-request-timeout">Cloud AI request timeout</label><div class="inline"><input id="cloud-ai-request-timeout" type="number" name="cloud_ai_request_timeout_seconds" min="{{ai_timeouts.cloud.min}}" max="{{ai_timeouts.cloud.max}}" step="1" value="{{ai_timeouts.cloud.value}}" required><span class="help">seconds</span></div></div>
+  <div class="form-row"><label for="chatbot-provider-timeout">Chatbot provider timeout</label><div class="inline"><input id="chatbot-provider-timeout" type="number" name="chatbot_provider_timeout_seconds" min="{{ai_timeouts.chatbot.min}}" max="{{ai_timeouts.chatbot.max}}" step="1" value="{{ai_timeouts.chatbot.value}}" required><span class="help">seconds per attempt</span></div></div>
+</div>
+<div class="section-actions"><button class="btn primary" type="submit" name="action" value="save_ai_timeouts">Save</button><button class="btn" type="submit" name="action" value="restore_ai_timeout_defaults">Restore Defaults</button></div>
+</form></div></div>
+</section>
+
+<div class="modal" id="discovery-test-modal" hidden onclick="if(event.target===this)closeModal('discovery-test-modal')"><div class="modal-card modal-xwide test-discovery-modal-card"><div class="modal-head"><b>Test Discovery</b><button type="button" class="icon-btn" onclick="closeModal('discovery-test-modal')">{% icon 'close' %}</button></div><div class="modal-body">
+  <div class="test-discovery-launch">
+    <div class="form-row stack"><label for="discovery-test-keyword">{% if discovery_test_uses_cloud %}Role focus{% else %}Keyword{% endif %}</label><input id="discovery-test-keyword" type="text" minlength="3" maxlength="240" autocomplete="off" value="{{discovery_test_default_keyword|default:'embedded firmware remote startup'}}" placeholder="{% if discovery_test_uses_cloud %}e.g. Emulation Engineer{% else %}e.g. remote embedded firmware engineer{% endif %}"><span id="discovery-test-keyword-error" class="muted test-discovery-validation"></span>{% if discovery_test_uses_cloud %}<span class="help">Used as the single primary role; the selected CV and relevant preferences are supplied separately.</span>{% endif %}</div>
+    <div class="form-row"><label for="discovery-test-provider">{% if discovery_test_uses_cloud %}Use route{% else %}Search engine{% endif %}</label>{% if not discovery_test_uses_cloud %}<select id="discovery-test-provider" aria-label="Search engine for Test Discovery">{% for p in discovery_test_providers %}<option value="{{p.id}}" data-health="{{p.health_state}}" data-health-title="{{p.health_title}}" {% if p.default %}selected{% endif %}>{{p.icon}} {{p.name}} ({{p.recent_requests}} requests, {{p.recent_results}} result{{p.recent_results|pluralize}})</option>{% empty %}<option value="" selected>No configured search engine</option>{% endfor %}</select>{% else %}<select id="discovery-test-provider" aria-label="Cloud route for Test Discovery"><option value="primary">Primary · {{discovery_test_cloud_provider|default:'Cloud AI'|title}} · {{discovery_test_cloud_primary|default:'not configured'}}</option>{% if discovery_test_cloud_secondary %}<option value="secondary">Secondary · {{discovery_test_cloud_provider|default:'Cloud AI'|title}} · {{discovery_test_cloud_secondary}}</option>{% endif %}</select>{% endif %}</div>
+    <div id="discovery-test-provider-hint" class="muted test-discovery-provider-hint"></div>
+    <div class="section-actions"><button type="button" class="btn success" id="discovery-run-test" {% if pipeline_model_active_job or discovery_test_active_job or discovery_mode == 'source_guided' and not discovery_test_providers %}disabled aria-busy="true"{% endif %} onclick="runDiscoveryTest()">Run Test</button></div>
+  </div>
+  <div id="discovery-test-result" class="inline-result"></div>
+  <h4 class="test-discovery-history-heading">Recent Test Runs</h4>
+  <div class="table-wrap test-discovery-table-wrap"><table id="ai-test-table"><thead><tr><th>Run</th><th>Status</th><th>Results</th><th>Started</th></tr></thead><tbody>{% for j in diagnostic_jobs %}{% if j.label == 'Profile-based Test Discovery' %}<tr><td>{{j.label}}{% if j.result.test_keyword %}<div class="muted test-run-keyword">{{j.result.test_keyword}}</div>{% endif %}</td><td>{% if j.result.state == 'limit_reached' %}<span class="tag limit-reached-tag"><span class="empty-gauge-icon" aria-hidden="true"></span> Limit reached</span>{% else %}<span class="tag {% if j.status == 'completed' %}green{% elif j.status == 'failed' %}red{% else %}blue{% endif %}">{{j.get_status_display}}</span>{% endif %}</td><td>{% if j.result.state == 'limit_reached' %}<button type="button" class="result-link" onclick="showDiscoverySummary('{{j.result|to_json|escapejs}}')">Not executed</button>{% elif j.status == 'completed' %}<button type="button" class="result-link" onclick="showDiscoverySummary('{{j.result|to_json|escapejs}}')">{{j.result.results|length}} result(s)</button>{% elif j.status == 'failed' %}<button type="button" class="result-link danger-text" onclick="showDiscoverySummary('{{j.result|to_json|escapejs}}','{{j.error|escapejs}}')">Failed</button>{% else %}{{j.message}} · {{j.progress}}%{% endif %}</td><td class="timestamp">{{j.created_at|date:'d/m/Y H:i:s'}}</td></tr>{% endif %}{% empty %}<tr><td colspan="4">No Test Discovery runs yet.</td></tr>{% endfor %}</tbody></table></div>
+</div></div></div>
+
+<div class="modal" id="provider-test-modal" hidden onclick="if(event.target===this)closeModal('provider-test-modal')"><div class="modal-card modal-form provider-test-modal-card"><div class="modal-head"><b id="provider-test-modal-title">Provider configuration test</b><button type="button" class="icon-btn" onclick="closeModal('provider-test-modal')">{% icon 'close' %}</button></div><div class="modal-body" id="provider-test-modal-body"></div></div></div>
+<div class="modal" id="chatbot-test-modal" hidden onclick="if(event.target===this)closeModal('chatbot-test-modal')"><div class="modal-card modal-form"><div class="modal-head"><b id="chatbot-test-title">Test Chatbot</b><button type="button" class="icon-btn" onclick="closeModal('chatbot-test-modal')">{% icon 'close' %}</button></div><div class="modal-body" id="chatbot-test-body"></div></div></div>
+<div class="modal" id="chatbot-auto-select-modal" hidden onclick="if(event.target===this)closeModal('chatbot-auto-select-modal')"><div class="modal-card modal-form chatbot-auto-select-modal-card"><div class="modal-head"><b>Chatbot Auto-detect</b><button type="button" class="icon-btn" onclick="closeModal('chatbot-auto-select-modal')">{% icon 'close' %}</button></div><div class="modal-body"><p class="muted">Choose the exact enabled provider ScoutBox should use to prepare Chatbot Primary and Secondary defaults. Nothing is saved until you click Save config.</p><div class="form-row chatbot-auto-provider-row"><label for="chatbot-auto-provider">Provider</label><select id="chatbot-auto-provider">{% for cfg in configs %}{% if cfg.enabled %}<option value="{{cfg.provider}}">{{cfg.get_provider_display}}{% if cfg.provider == 'ollama' %} · Local{% else %} · Cloud{% endif %}</option>{% endif %}{% empty %}<option value="">No enabled provider</option>{% endfor %}</select></div><div class="section-actions"><button type="button" class="btn primary" onclick="chooseChatbotAutoProvider()">Apply Auto-detect</button></div></div></div></div>
+<div class="modal" id="cloud-auto-detect-modal" hidden onclick="if(event.target===this)closeModal('cloud-auto-detect-modal')"><div class="modal-card modal-form cloud-auto-detect-modal-card"><div class="modal-head"><b>Cloud Web Auto-detect</b><button type="button" class="icon-btn" onclick="closeModal('cloud-auto-detect-modal')">{% icon 'close' %}</button></div><div class="modal-body"><p class="muted">Choose the enabled Cloud provider to apply across every Discovery stage. ScoutBox will prepare cost-aware Primary/Failover defaults; you can change any stage afterward.</p><div class="form-row"><label for="cloud-auto-provider">Provider</label><select id="cloud-auto-provider">{% for cfg in cloud_providers %}<option value="{{cfg.provider}}">{{cfg.get_provider_display}}</option>{% empty %}<option value="">No enabled Cloud provider</option>{% endfor %}</select></div><div class="section-actions"><button type="button" class="btn primary" onclick="chooseCloudAutoProvider()">Apply Auto-detect</button></div></div></div></div>
+<div class="modal" id="discovery-summary" hidden onclick="if(event.target===this)closeModal('discovery-summary')"><div class="modal-card modal-xwide diagnostic-summary-card"><div class="modal-head"><b>Discovery Summary</b><button type="button" class="icon-btn" onclick="closeModal('discovery-summary')">{% icon 'close' %}</button></div><div class="modal-body" id="discovery-summary-body"></div></div></div>
+<div class="modal" id="pipeline-model-summary" hidden onclick="if(event.target===this)closeModal('pipeline-model-summary')"><div class="modal-card modal-xwide pipeline-model-summary-card"><div class="modal-head"><b id="pipeline-model-summary-title">Selection Test Results</b><button type="button" class="icon-btn" onclick="closeModal('pipeline-model-summary')">{% icon 'close' %}</button></div><div class="modal-body" id="pipeline-model-summary-body"></div></div></div>
+{{pipeline_presets|json_script:'pipeline-presets-data'}}
+{% endblock %}
+{% block scripts %}<script>
+function aiCsrf(){const m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);return m?decodeURIComponent(m[1]):''}
+function aiEscapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function setChatbotFormBusy(busy){
+  const form=document.getElementById('chatbot-config-form');if(!form)return;
+  [...form.elements].forEach(control=>{
+    if(busy){
+      if(control.dataset.chatbotBusyDisabled===undefined)control.dataset.chatbotBusyDisabled=control.disabled?'1':'0';
+      control.disabled=true;control.setAttribute('aria-busy','true');
+    }else if(control.dataset.chatbotBusyDisabled!==undefined){
+      const wasDisabled=control.dataset.chatbotBusyDisabled==='1';delete control.dataset.chatbotBusyDisabled;
+      control.disabled=wasDisabled;control.removeAttribute('aria-busy');
+    }
+  });
+}
+function chatbotLaneElements(lane='primary'){
+  const secondary=lane==='secondary';
+  return {
+    provider:document.getElementById(secondary?'chatbot-secondary-provider':'chatbot-provider'),
+    model:document.getElementById(secondary?'chatbot-secondary-model':'chatbot-model'),
+    status:document.getElementById(secondary?'chatbot-secondary-model-status':'chatbot-model-status'),
+    testStatus:document.getElementById(secondary?'chatbot-secondary-test-status':'chatbot-primary-test-status'),
+    internetRow:document.getElementById(secondary?'chatbot-secondary-internet-search-row':'chatbot-internet-search-row'),
+    internet:document.getElementById(secondary?'chatbot-secondary-allow-internet-search':'chatbot-allow-internet-search'),
+  }
+}
+function paintChatbotTestStatus(lane,state='unknown',title='Not tested'){
+  const el=chatbotLaneElements(lane),icon=el.testStatus;if(!icon)return;
+  icon.className='chatbot-route-test-status '+state;icon.textContent=state==='ok'?'✓':state==='warning'?'!':state==='testing'?'↻':'?';icon.title=title||'Not tested';icon.setAttribute('aria-label',(lane==='secondary'?'Secondary: ':'Primary: ')+(title||'Not tested'));
+}
+function updateChatbotLastTest(lane,stamp=''){
+  const hint=document.getElementById('chatbot-last-tested');if(!hint)return;
+  const key=lane==='secondary'?'secondaryTested':'primaryTested';hint.dataset[key]=stamp||'';
+  const p=hint.dataset.primaryTested||'not run',s=hint.dataset.secondaryTested||'not run';hint.textContent='Last tested: Primary '+p+' · Secondary '+s;
+}
+function invalidateChatbotTestStatus(lane,label='Not tested after selection change'){
+  paintChatbotTestStatus(lane,'unknown',label);updateChatbotLastTest(lane,'');
+}
+function updateChatbotInternetOption(lane='primary'){
+  const el=chatbotLaneElements(lane),provider=el.provider?.value||'';
+  const cloud=['openai','gemini','openrouter'].includes(provider);
+  if(el.internetRow)el.internetRow.hidden=!cloud;
+  if(el.internet){el.internet.disabled=!cloud;if(!cloud)el.internet.checked=false}
+}
+async function loadChatbotModels(lane='primary',preferred=''){
+  const el=chatbotLaneElements(lane),provider=el.provider?.value||'',select=el.model,status=el.status;
+  if(!provider||!select)return false;
+  const storedProvider=select.dataset.currentProvider||'';
+  const providerMatchesStored=storedProvider===provider;
+  const current=preferred||(providerMatchesStored?(select.value||select.dataset.current||''):'');
+  // Clear the old provider's choices before the catalogue request. A stale model must never
+  // remain visible under a newly selected provider while validation is in progress or fails.
+  select.disabled=true;select.innerHTML='<option value="">Loading models…</option>';select.value='';
+  if(status)status.textContent='Loading models…';
+  try{
+    const payload=providerRequestData(provider);payload.set('provider',provider);
+    const resp=await fetch('{% url "ai_provider_validate" %}',{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'Content-Type':'application/x-www-form-urlencoded'},body:payload.toString()});
+    const data=await resp.json();if(!resp.ok||!data.ok)throw new Error(data.error||'Unable to load models.');
+    select.innerHTML='<option value="">Select model…</option>';let matched=false;
+    const ids=new Set();
+    (data.models||[]).forEach(m=>{const id=String(m.id||'');if(!id)return;ids.add(id);const o=document.createElement('option');o.value=id;o.textContent=m.label||id;if(id===current){o.selected=true;matched=true}select.appendChild(o)});
+    let replacement='';
+    if(current&&!matched){
+      const saved=String(data.saved_model||'');
+      if(saved&&ids.has(saved)){select.value=saved;replacement=saved}
+      if(status)status.textContent=replacement
+        ? 'The previously selected model is not available from '+provider+'. Using this provider’s configured model '+replacement+'; save config to apply it.'
+        : 'The previously selected model is not available from '+provider+'. Select a listed model.';
+    }else if(status){
+      status.textContent=(data.models||[]).length?'':'No models detected for this provider.';
+    }
+    select.dataset.current=select.value||'';select.dataset.currentProvider=provider;
+    if(preferred)return matched;
+    return true;
+  }catch(e){
+    select.innerHTML='';
+    if(current){const o=document.createElement('option');o.value=current;o.textContent=current;o.selected=true;select.appendChild(o);select.value=current;select.dataset.current=current}
+    else{const o=document.createElement('option');o.value='';o.textContent='Unable to load models';select.appendChild(o);select.value='';select.dataset.current=''}
+    select.dataset.currentProvider=provider;
+    if(status)status.textContent=(e.message||String(e))+' You can keep a documented/manual model and use Test to verify it.';return !!current;
+  }finally{select.disabled=false}
+}
+function applyChatbotRoute(lane,route){
+  const el=chatbotLaneElements(lane);if(!el.provider||!el.model||!route)return false;
+  const provider=String(route.provider||''),model=String(route.model||'');
+  if(![...el.provider.options].some(o=>o.value===provider))throw new Error('Auto-detected '+provider+' is not enabled in Provider Configuration.');
+  el.provider.value=provider;el.model.innerHTML='';const option=document.createElement('option');option.value=model;option.textContent=model;option.selected=true;el.model.appendChild(option);el.model.value=model;el.model.dataset.current=model;el.model.dataset.currentProvider=provider;updateChatbotInternetOption(lane);invalidateChatbotTestStatus(lane);return true;
+}
+function openChatbotAutoSelectModal(){openModal('chatbot-auto-select-modal')}
+function chooseChatbotAutoProvider(){const provider=document.getElementById('chatbot-auto-provider')?.value||'';if(!provider){portalAlert('Enable and choose a provider first.');return}closeModal('chatbot-auto-select-modal');autoSelectChatbotRoutes(provider)}
+async function autoSelectChatbotRoutes(provider){
+  const button=document.getElementById('chatbot-auto-select'),status=document.getElementById('chatbot-auto-status');
+  const original=button?.textContent||'Auto-detect';if(button){button.disabled=true;button.textContent='Detecting…'}if(status)status.textContent='Preparing '+provider+' Chatbot defaults from hardware/documented model metadata…';
+  try{
+    const payload=new URLSearchParams({action:'auto_select_chatbot_routes',provider:String(provider||'')});
+    const resp=await fetch(location.pathname,{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'X-Requested-With':'fetch','Content-Type':'application/x-www-form-urlencoded'},body:payload.toString()});
+    const data=await resp.json();if(!resp.ok||!data.ok)throw new Error(data.error||'Auto-detect failed.');
+    const okPrimary=applyChatbotRoute('primary',data.primary),okSecondary=applyChatbotRoute('secondary',data.secondary);
+    if(!okPrimary||!okSecondary)throw new Error('The detected Chatbot routes could not be applied.');
+    if(status)status.textContent='';
+  }catch(e){if(status)status.textContent=e.message||String(e)}
+  finally{if(button){button.disabled=false;button.textContent=original}}
+}
+async function testChatbotLane(lane='primary'){
+  const secondary=lane==='secondary',el=chatbotLaneElements(lane),provider=el.provider?.value||'',model=el.model?.value?.trim()||'';
+  const laneLabel=secondary?'Secondary':'Primary';
+  if(!provider||!model)throw new Error('Select the '+laneLabel.toLowerCase()+' provider and exact model first.');
+  paintChatbotTestStatus(lane,'testing','Testing '+provider+' · '+model+'…');
+  try{
+    const allowInternet=['openai','gemini','openrouter'].includes(provider) && !!el.internet?.checked;
+    const form=new URLSearchParams({provider,model,lane,allow_internet_search:allowInternet?'1':'0'});
+    const resp=await fetch('{% url "chatbot_test" %}',{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
+    const data=await resp.json(),answer=data.answer||data.error||'No response returned.',mode=data.internet_search?' · internet search enabled':'';
+    const sourceText=(data.sources||[]).length?('<div class="help top-gap"><b>Web sources</b><br>'+data.sources.map(aiEscapeHtml).join('<br>')+'</div>'):'';
+    paintChatbotTestStatus(lane,data.ok?'ok':'warning',data.ok?'Validated · '+provider+' · '+model:'Test failed · '+provider+' · '+model+' · '+answer);
+    updateChatbotLastTest(lane,data.tested_at||new Date().toLocaleString());
+    return {ok:!!data.ok,html:'<div class="chatbot-selection-test-result"><div class="notice '+(data.ok?'success':'danger')+'"><b>'+aiEscapeHtml(data.ok?laneLabel+' Chatbot responded':laneLabel+' Chatbot test failed')+'</b><div class="help top-gap">'+aiEscapeHtml((data.provider||provider)+' · '+(data.model||model)+mode)+'</div></div><div class="chatbot-test-question"><b>Question</b><div>'+aiEscapeHtml(data.question||'Where do deleted items go in ScoutBox?')+'</div></div><div class="chatbot-test-answer"><b>Answer</b><div>'+aiEscapeHtml(answer)+'</div>'+sourceText+'</div></div>'};
+  }catch(err){
+    const stamp=new Date().toLocaleString();paintChatbotTestStatus(lane,'warning','Test failed · '+String(err));updateChatbotLastTest(lane,stamp);
+    return {ok:false,html:'<div class="chatbot-selection-test-result"><div class="notice danger"><b>'+aiEscapeHtml(laneLabel+' Chatbot test failed')+'</b><div>'+aiEscapeHtml(String(err))+'</div></div></div>'};
+  }
+}
+async function testChatbotSelection(){
+  const button=document.getElementById('test-chatbot-selection-button'),body=document.getElementById('chatbot-test-body'),title=document.getElementById('chatbot-test-title');
+  for(const lane of ['primary','secondary']){const el=chatbotLaneElements(lane);if(!el.provider?.value||!el.model?.value?.trim()){portalAlert('Select both Primary and Secondary providers and exact models first.','Test Selection');return}}
+  const original=button?.textContent||'Test Selection';if(button)button.textContent='Testing…';if(title)title.textContent='Test Chatbot Selection';
+  for(const lane of ['primary','secondary']){const el=chatbotLaneElements(lane);paintChatbotTestStatus(lane,'testing','Queued for Test Selection · '+(el.provider?.value||'')+' · '+(el.model?.value||''))}
+  setChatbotFormBusy(true);
+  try{
+    const results=[];
+    // Run sequentially so a local Primary/Secondary pair does not compete for the same GPU.
+    for(const lane of ['primary','secondary'])results.push(await testChatbotLane(lane));
+    if(body)body.innerHTML=results.map(row=>row.html).join('');
+  }finally{
+    setChatbotFormBusy(false);if(button){button.textContent=original;button.removeAttribute('aria-busy')}openModal('chatbot-test-modal');
+  }
+}
+
+const activePipelineModelJobId={% if pipeline_model_active_job %}{{pipeline_model_active_job.pk}}{% else %}null{% endif %};
+const activeDiscoveryTestJobId={% if discovery_test_active_job %}{{discovery_test_active_job.pk}}{% else %}null{% endif %};
+let discoveryActionBusy=false;
+const pipelinePresets=JSON.parse(document.getElementById('pipeline-presets-data')?.textContent||'{}');
+
+function setDiscoveryActionsBusy(busy,label='Testing in progress',allowDiscoveryView=false){
+  discoveryActionBusy=!!busy;
+  document.querySelectorAll('.pipeline-mode-actions button:not([data-discovery-test-action]),.cloud-discovery-actions button:not([data-discovery-test-action])').forEach(btn=>{btn.disabled=!!busy;btn.setAttribute('aria-busy',busy?'true':'false')});
+  document.querySelectorAll('[data-discovery-test-action]').forEach(btn=>{
+    btn.disabled=!!busy&&!allowDiscoveryView;
+    btn.setAttribute('aria-busy',busy?'true':'false');
+    if(allowDiscoveryView&&busy)btn.textContent='View Test Discovery';
+    else if(!busy)btn.textContent='Test Discovery';
+  });
+  const run=document.getElementById('discovery-run-test');if(run)run.disabled=!!busy;
+  // A running model/discovery test must validate a stable configuration. Freeze the
+  // Local AI Discovery/Cloud-Web selector, all model dropdowns and token-cap inputs until
+  // the test finishes. Preserve controls that were already disabled by mode rules.
+  document.querySelectorAll('#discovery-mode-select,#pipeline-routing-form select,#pipeline-routing-form input[type=number],#cloud-selection-form select,#cloud-selection-form input[type=number]').forEach(control=>{
+    if(busy){
+      if(control.dataset.testBusyOriginalDisabled===undefined)control.dataset.testBusyOriginalDisabled=control.disabled?'1':'0';
+      control.disabled=true;control.setAttribute('aria-busy','true');
+    }else if(control.dataset.testBusyOriginalDisabled!==undefined){
+      const wasDisabled=control.dataset.testBusyOriginalDisabled==='1';delete control.dataset.testBusyOriginalDisabled;
+      control.disabled=wasDisabled;control.removeAttribute('aria-busy');
+    }
+  });
+  const hint=document.getElementById('discovery-active-test-status');
+  if(hint){
+    if(busy){hint.textContent=label;hint.dataset.testBusy='1'}
+    else if(hint.dataset.testBusy==='1'){hint.textContent='';delete hint.dataset.testBusy}
+  }
+}
+
+function confirmDiscoverySubmit(event,button,message){
+  event.preventDefault();
+  portalConfirm(message,'Confirm Discovery change','Continue').then(ok=>{if(ok&&button?.form)button.form.requestSubmit(button)});
+  return false;
+}
+
+function pipelineStageName(stage){
+  return ({url_scrape:'URL discovery',jd_analysis:'JD analysis',first_filter:'First filter',company_enrichment:'Company enrichment',freshness:'Freshness',page_summarization:'Page summarization',cv_tailoring:'Resume tailoring',email_draft:'Email draft',question_answers:'Application questions',cold_contact:'Cold contact',import_inference:'Import inference'})[stage]||String(stage||'Stage').replaceAll('_',' ');
+}
+
+function addPipelineStageDetails(stage,parent,open=false){
+  const details=document.createElement('details');details.className='advanced pipeline-test-stage-detail';details.open=!!open;
+  const summary=document.createElement('summary');
+  const ok=stage.status==='ok',running=stage.status==='running'||stage.complete===false;
+  const stageDuration=Number(stage.duration_seconds);
+  const timingSuffix=Number.isFinite(stageDuration)?' · '+stageDuration.toFixed(stageDuration<10?2:1)+' s':'';
+  summary.textContent=pipelineStageName(stage.stage)+' · '+(running?'Testing':ok?'Usable':'Needs attention')+(stage.detail?' · '+stage.detail:'')+timingSuffix;
+  details.appendChild(summary);
+  const meta=document.createElement('div');meta.className='pipeline-test-meta';
+  const pairs=[];
+  if(stage.provider)pairs.push('Provider: '+stage.provider);
+  if(stage.model)pairs.push('Model: '+stage.model);
+  if(stage.started_at)pairs.push('Started: '+stage.started_at);
+  if(stage.ended_at)pairs.push('Ended: '+stage.ended_at);
+  if(Number.isFinite(stageDuration))pairs.push('Duration: '+stageDuration.toFixed(stageDuration<10?2:1)+' s');
+  if(stage.search_provider_tests!==undefined)pairs.push('Search providers: '+String(stage.search_provider_successes||0)+'/'+String(stage.search_provider_tests||0)+' passed');
+  meta.textContent=pairs.join(' · ');
+  if(meta.textContent)details.appendChild(meta);
+  const attempts=Array.isArray(stage.attempts)?stage.attempts:[];
+  if(attempts.length){
+    const wrap=document.createElement('div');wrap.className='table-wrap top-gap';
+    const table=document.createElement('table');table.className='table-compact pipeline-test-attempts';
+    table.innerHTML='<thead><tr><th>Test</th><th>Provider / Model</th><th>Status</th><th>Started</th><th>Ended</th><th>Duration</th><th>Detail</th></tr></thead>';
+    const body=document.createElement('tbody');
+    attempts.forEach(a=>{
+      const tr=document.createElement('tr');
+      const test=document.createElement('td');test.textContent=a.role||'request';
+      const target=document.createElement('td');target.textContent=[a.provider||'',a.model||''].filter(Boolean).join(' · ');
+      const state=document.createElement('td');state.textContent=a.ok?'Passed':'Failed';state.className=a.ok?'success-text':'warning-text';
+      const started=document.createElement('td');started.textContent=a.started_at||'';
+      const ended=document.createElement('td');ended.textContent=a.ended_at||'';
+      const duration=document.createElement('td');const seconds=Number(a.duration_seconds);duration.textContent=Number.isFinite(seconds)?seconds.toFixed(seconds<10?2:1)+' s':'';
+      const detail=document.createElement('td');
+      let bits=[a.detail||''];
+      if(a.result_count!==undefined)bits.push(String(a.result_count)+' result(s)');
+      if(a.latency_ms)bits.push(String(a.latency_ms)+' ms provider latency');
+      if(a.mode)bits.push(a.mode);
+      detail.textContent=bits.filter(Boolean).join(' · ');
+      tr.append(test,target,state,started,ended,duration,detail);body.appendChild(tr);
+    });
+    table.appendChild(body);wrap.appendChild(table);details.appendChild(wrap);
+  }
+  const raw=document.createElement('details');raw.className='advanced pipeline-test-raw';
+  const rawSummary=document.createElement('summary');rawSummary.textContent='Raw test record';
+  const pre=document.createElement('pre');pre.className='raw-response';pre.textContent=JSON.stringify(stage,null,2);
+  raw.append(rawSummary,pre);details.appendChild(raw);
+  parent.appendChild(details);
+}
+
+function showPipelineModelSummary(raw,single=false){
+  let d=raw;
+  if(typeof raw==='string'){try{d=JSON.parse(raw||'{}')}catch(e){d={stages:[],parse_error:String(e)}}}
+  d=d||{};
+  const stages=Array.isArray(d.stages)?d.stages:[];
+  const body=document.getElementById('pipeline-model-summary-body');body.innerHTML='';
+  const title=document.getElementById('pipeline-model-summary-title');
+  title.textContent=single&&stages[0]?pipelineStageName(stages[0].stage)+' Test Result':'Selection Test Results';
+  if(!single){
+    const summary=document.createElement('div');summary.className='notice '+((Number(d.failed_count)||0)?'warn':'success');
+    summary.textContent='Model test · '+String(d.ok_count??stages.filter(x=>x.status==='ok').length)+' usable · '+String(d.failed_count??stages.filter(x=>x.status!=='ok'&&x.status!=='running').length)+' unavailable'+(Number(d.route_warning_count||0)?' · '+String(d.route_warning_count)+' route warning(s)':'')+(d.tested_at?' · '+d.tested_at:'');
+    body.appendChild(summary);
+  }
+  stages.forEach(stage=>addPipelineStageDetails(stage,body,single||stage.status!=='ok'));
+  if(!stages.length){
+    const n=document.createElement('div');n.className='notice warn';n.textContent='No stage-level test result was stored for this run.';body.appendChild(n);
+  }
+  openModal('pipeline-model-summary');
+}
+
+function showPipelineStageResult(raw){
+  let stage={};try{stage=typeof raw==='string'?JSON.parse(raw||'{}'):(raw||{})}catch(e){stage={stage:'Stage',status:'warning',detail:'Unable to parse stored test result: '+String(e),attempts:[]}}
+  showPipelineModelSummary({stages:[stage],ok_count:stage.status==='ok'?1:0,failed_count:stage.status==='ok'?0:1},true);
+}
+
+function routeStateFromAttempt(stage,role){
+  const explicit=stage?.[role+'_state'];if(explicit)return explicit;
+  const attempt=(stage?.attempts||[]).find(a=>a.role===role);return attempt?(attempt.ok?'ok':'warning'):'unknown';
+}
+function routeTitleFromAttempt(stage,role){
+  const explicit=stage?.[role+'_title'];if(explicit)return explicit;
+  const a=(stage?.attempts||[]).find(x=>x.role===role);return a?[a.provider||'',a.model||'',a.detail||''].filter(Boolean).join(' · '):'Not tested';
+}
+function paintRouteStatus(icon,state,title){
+  if(!icon)return;icon.className='pipeline-route-status '+(state||'unknown');icon.title=title||'Not tested';icon.setAttribute('aria-label',title||'Not tested');
+  icon.textContent=state==='ok'?'✓':state==='warning'?'!':state==='testing'?'↻':state==='queued'?'…':state==='na'||state==='limit_reached'?'':'?';
+}
+function applyPipelineModelResult(result){
+  (result?.stages||[]).forEach(stage=>{
+    const row=document.querySelector('.pipeline-routing-table tr[data-pipeline-stage="'+CSS.escape(stage.stage||'')+'"]');
+    if(!row)return;
+    const icon=row.querySelector('.pipeline-stage-status');
+    const link=row.querySelector('.pipeline-stage-link');
+    const complete=stage.complete!==false&&stage.status!=='running';
+    const ok=complete&&stage.status==='ok';
+    const title=[stage.provider||'',stage.model||'',stage.detail||''].filter(Boolean).join(' · ')||(complete?(ok?'Usable':'Needs attention'):'Testing…');
+    if(icon){icon.className='pipeline-stage-status '+(complete?(ok?'ok':'warning'):'testing');icon.textContent=complete?(ok?'✓':'!'):'↻';icon.title=title;icon.setAttribute('aria-label',title)}
+    const primary=row.querySelector('.pipeline-route-status[data-route-role="primary"]');
+    const fallback=row.querySelector('.pipeline-route-status[data-route-role="fallback"]');
+    paintRouteStatus(primary,complete?routeStateFromAttempt(stage,'primary'):'testing',complete?routeTitleFromAttempt(stage,'primary'):'Testing…');
+    paintRouteStatus(fallback,complete?routeStateFromAttempt(stage,'fallback'):'testing',complete?routeTitleFromAttempt(stage,'fallback'):'Testing…');
+    if(link){link.disabled=false;link.classList.remove('untested');link.dataset.stageResult=JSON.stringify(stage)}
+  });
+}
+
+
+function updatePipelineLastTest(job,stale=false){
+  const hint=document.getElementById('pipeline-model-last-test');if(!hint)return;
+  const stamp=job?.finished_at||job?.created_at||hint.dataset.timestamp||'';
+  if(stamp)hint.dataset.timestamp=stamp;
+  hint.textContent='Last tested: '+(stamp||'not run yet')+(stale?' · selection changed; retest required':'');
+}
+
+function renderPipelineModelInline(result,out,error=''){
+  out.innerHTML='';
+  const failed=Number(result?.failed_count||0),passed=Number(result?.ok_count||0),warnings=Number(result?.route_warning_count||0);
+  out.className='notice '+(failed?'warn':'success');
+  const line=document.createElement('div');line.textContent=error||('Model test complete · '+passed+' usable stage'+(passed===1?'':'s')+' · '+failed+' unavailable'+(warnings?' · '+warnings+' route warning'+(warnings===1?'':'s'):'')+'.');
+  out.appendChild(line);
+  const details=document.createElement('details');details.className='pipeline-test-inline-details top-gap';details.open=failed>0||warnings>0;
+  const sum=document.createElement('summary');sum.textContent='Test details';
+  details.appendChild(sum);
+  (result?.stages||[]).forEach(stage=>addPipelineStageDetails(stage,details,stage.status!=='ok'||(stage.attempts||[]).some(a=>a.ok===false)));
+  out.appendChild(details);
+  const btn=document.createElement('button');btn.type='button';btn.className='btn small top-gap';btn.textContent='Open full details';btn.addEventListener('click',()=>showPipelineModelSummary(result));
+  out.appendChild(btn);
+}
+
+function renderPipelineModelProgress(job,out){
+  out.innerHTML='';out.className='notice';
+  const line=document.createElement('div');line.textContent=(job.message||'Testing current selections')+' · '+String(job.progress||0)+'%';out.appendChild(line);
+  const actions=document.createElement('div');actions.className='section-actions top-gap';
+  const result=job.result||{};if((result.stages||[]).length){const btn=document.createElement('button');btn.type='button';btn.className='btn small';btn.textContent='View current details';btn.addEventListener('click',()=>showPipelineModelSummary(result));actions.appendChild(btn)}
+  const stop=document.createElement('button');stop.type='button';stop.className='btn small danger';stop.textContent='Stop test';stop.addEventListener('click',()=>stopAiTest(job.id||job.pk,out));actions.appendChild(stop);out.appendChild(actions);
+}
+
+async function stopAiTest(jobId,out){
+  if(!jobId)return;
+  if(!await portalConfirm('Stop the current selection test? Completed stage results will remain available.','Stop test','Stop test'))return;
+  try{const r=await fetch('/jobs/'+jobId+'/cancel/',{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'X-Requested-With':'fetch'}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to stop test');if(out){out.className='notice warn';out.textContent=d.message||'Stopping test…'}}catch(e){if(out){out.className='notice danger';out.textContent=e.message||String(e)}}
+}
+
+
+async function pollAiJob(jobId,data,out){
+  const guarded=data.test==='pipeline_models'||data.test==='discovery';
+  if(guarded)setDiscoveryActionsBusy(true,data.test==='pipeline_models'?'Testing pipeline models…':'Testing discovery…',data.test==='discovery');
+  try{
+    while(true){
+      const r=await fetch('/jobs/'+jobId+'/status/',{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Unable to read test status');
+      if(data.test==='pipeline_models'){
+        const active=document.getElementById('discovery-active-test-status');if(active&&!j.finished){active.textContent=(j.message||'Testing selection…')+' · '+String(j.progress||0)+'%';active.dataset.testBusy='1'}
+        if(j.result){applyPipelineModelResult(j.result);if(j.finished)renderPipelineModelInline(j.result,out,j.error||'');else renderPipelineModelProgress(j,out)}
+        else{out.className='notice';out.textContent=(j.message||j.status)+' · '+String(j.progress||0)+'%'}
+        if(j.finished)updatePipelineLastTest(j,j.status!=='completed');
+      }else if(data.test==='ollama_chat'){
+        out.className='notice '+(j.status==='completed'?'success':j.status==='failed'?'danger':'');
+        out.innerHTML='';
+        const status=document.createElement('div');status.textContent=j.error||j.message||j.status;out.appendChild(status);
+        if(j.finished&&j.result?.answer){const answer=document.createElement('div');answer.className='ai-test-answer';answer.textContent=j.result.answer;out.appendChild(answer);}
+        if(j.finished&&j.result?.model){const meta=document.createElement('div');meta.className='muted ai-test-model';meta.textContent='Model: '+j.result.model;out.appendChild(meta);}
+        if(!j.finished){const progress=document.createElement('span');progress.className='muted';progress.textContent=' · '+String(j.progress||0)+'%';status.appendChild(progress);}
+      }else{
+        const limited=j.result?.state==='limit_reached';
+        out.className='notice '+(limited?'warn limit-reached-result':j.status==='completed'?'success':j.status==='failed'?'danger':'');
+        let text=j.error||j.message||j.status;
+        if(limited){const used=j.result?.used,limit=j.result?.limit,name=j.result?.name||j.result?.limit_name||'Cloud AI';text='Not executed — Limit reached'+(name?' · '+name:'')+((used!==undefined&&limit!==undefined)?' '+used+' / '+limit:'');}
+        else if(data.test==='discovery'&&j.finished&&j.status==='completed'&&j.result&&Array.isArray(j.result.results))text='Test complete · '+j.result.results.length+' result(s).';
+        if(j.result&&j.result.answer)text+='\n\n'+j.result.answer;if(j.result&&j.result.model)text+='\n\nModel: '+j.result.model;
+        out.textContent=text+(j.finished?'':' · '+String(j.progress||0)+'%');
+        if(data.test==='discovery'){
+          const active=document.getElementById('discovery-active-test-status');if(active)active.textContent=j.finished?('Last Test Discovery: '+(j.finished_at||j.created_at||'completed')):('Test Discovery: '+(j.message||j.status)+' · '+String(j.progress||0)+'%');
+        }
+        if(j.finished&&data.test==='discovery'&&j.result&&(j.result.stages||j.result.results)){
+          const br=document.createElement('br'),btn=document.createElement('button');btn.type='button';btn.className='btn small top-gap';btn.textContent='View details';btn.addEventListener('click',()=>showDiscoverySummary(JSON.stringify(j.result||{}),j.error||''));out.append(br,btn);
+        }
+      }
+      if(j.finished)return j;
+      await new Promise(resolve=>setTimeout(resolve,1200));
+    }
+  }finally{if(guarded)setDiscoveryActionsBusy(false)}
+}
+
+async function queueAiTest(data,out){
+  out.className='notice';out.textContent='Queued…';
+  if(data.test==='pipeline_models'||data.test==='discovery')setDiscoveryActionsBusy(true,'Queueing test…',data.test==='discovery');
+  try{
+    const r=await fetch('{% url "ai_test_async" %}',{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(data).toString()});
+    const d=await r.json();if(!r.ok||!d.job_id)throw new Error(d.error||'Unable to queue test');
+    return await pollAiJob(d.job_id,data,out);
+  }catch(e){out.className='notice danger';out.textContent=e.message||String(e);if(data.test==='pipeline_models'||data.test==='discovery')setDiscoveryActionsBusy(false);throw e}
+}
+
+
+function providerRow(provider){return document.querySelector('[data-provider-row="'+CSS.escape(provider)+'"]')}
+function providerRequestData(provider){
+  const row=providerRow(provider),data=new URLSearchParams({provider});
+  if(!row)return data;
+  data.set('base_url',row.querySelector('[data-provider-base-url]')?.value?.trim()||'');
+  data.set('api_key',row.querySelector('[data-provider-api-key]')?.value||'');
+  data.set('max_output_tokens',row.querySelector('[data-provider-token-cap]')?.value||'');
+  return data;
+}
+function setProviderResult(el,message,kind=''){
+  if(!el)return;el.className='inline-result provider-inline-status'+(kind?' '+kind:'');el.textContent=message||'';
+}
+function populateProviderModels(provider,models){
+  const row=providerRow(provider),select=row?.querySelector('[data-provider-model]');if(!select)return;
+  const current=select.value||'';select.innerHTML='';
+  const automatic=document.createElement('option');automatic.value='';automatic.textContent='Automatic';select.appendChild(automatic);
+  let matched=false;
+  (models||[]).forEach(item=>{const option=document.createElement('option');option.value=item.id||'';option.textContent=item.label||item.id||'';if(option.value===current){option.selected=true;matched=true}select.appendChild(option)});
+  if(current&&!matched){const configured=document.createElement('option');configured.value=current;configured.textContent=current+' (configured)';configured.selected=true;select.appendChild(configured)}
+  if(!current)select.value='';
+  updateProviderTestButton(provider);
+}
+function updateProviderModelTags(provider,models){
+  const wrap=document.querySelector('[data-provider-model-tags="'+CSS.escape(provider)+'"]');if(!wrap)return;wrap.innerHTML='';
+  if(!(models||[]).length){const empty=document.createElement('span');empty.className='muted';empty.textContent='No models detected';wrap.appendChild(empty);return}
+  (models||[]).forEach(item=>{const chip=document.createElement('span');chip.className='chip';chip.textContent=item.id||item.label||'';wrap.appendChild(chip)});
+}
+function updateProviderTestButton(provider){
+  const row=providerRow(provider),button=row?.querySelector('[data-provider-test]');if(button)button.disabled=false;
+}
+function setCloudDiscoveryAvailability(available){
+  const mode=document.getElementById('discovery-mode-select');if(!mode)return;
+  if(available){mode.disabled=false;mode.removeAttribute('title');document.querySelectorAll('#discovery-mode-form input[type="hidden"][name="discovery_mode"]').forEach(input=>input.remove())}
+  else if(mode.dataset.current!=='cloud_web'){mode.disabled=true;mode.title='Configure an enabled Cloud provider with credentials and a resolved model to enable Cloud Web'}
+}
+function exposeResolvedCloudModel(provider,model,webResearch=''){
+  if(!new Set(['openai','gemini','openrouter']).has(provider)||!model)return;
+  const unavailable=['Unavailable','No content returned'].includes(String(webResearch||''));
+  if(!unavailable)setCloudDiscoveryAvailability(true);
+}
+function providerDisplayName(provider){return ({openai:'OpenAI',gemini:'Gemini',openrouter:'OpenRouter',ollama:'Ollama local'})[provider]||provider}
+function providerTestRow(label,value){if(value===undefined||value===null||value==='')return '';return '<div class="kv"><b>'+aiEscapeHtml(label)+'</b><span>'+aiEscapeHtml(String(value))+'</span></div>'}
+function showProviderTestResult(provider,data,error=''){
+  const title=document.getElementById('provider-test-modal-title'),body=document.getElementById('provider-test-modal-body');if(!body)return;
+  const ok=!!data?.ok&&!error,diag=data?.diagnostics||{};
+  if(title)title.textContent=providerDisplayName(provider)+' configuration test';
+  let html='<div class="notice '+(ok?'success':'danger')+'"><b>'+(ok?'Test passed':'Test failed')+'</b>';
+  if(data?.model)html+='<div class="help top-gap">'+aiEscapeHtml(data.model)+(data.model_selection?' · '+aiEscapeHtml(data.model_selection):'')+'</div>';
+  html+='</div><div class="provider-test-popup-details">';
+  html+=providerTestRow('Provider',providerDisplayName(provider));
+  html+=providerTestRow('Requested model',data?.requested_model||'Automatic');
+  html+=providerTestRow('Tested model',data?.model||diag.model||'');
+  html+=providerTestRow('Model selection',data?.model_selection||diag.model_selection||'');
+  html+=providerTestRow('Phase',diag.phase||'');
+  html+=providerTestRow('Base URL',diag.base_url||'');
+  if(provider!=='ollama')html+=providerTestRow('Credential',diag.credential_source||'')+providerTestRow('Saved key present',diag.saved_key_present?'Yes':'No');
+  if(ok){
+    html+=providerTestRow('Models discovered',data?.model_count??diag.model_count??'');
+    html+=providerTestRow('Prompt tokens',data?.tokens_in??0)+providerTestRow('Visible output tokens',data?.tokens_out??0)+providerTestRow('Thinking tokens',data?.thinking_tokens??diag.thinking_tokens??0)+providerTestRow('Total tokens',data?.total_tokens??diag.total_tokens??0);
+    html+=providerTestRow('Finish reason',data?.finish_reason||diag.finish_reason||'')+providerTestRow('HTTP status',data?.http_status||diag.http_status||'')+providerTestRow('Thinking mode',diag.thinking_mode||'');
+    if(provider!=='ollama')html+=providerTestRow('Web research',data?.web_research||'Not tested');
+    if(data?.web_error)html+=providerTestRow('Web research detail',data.web_error);
+    html+='</div><div class="provider-test-popup-response"><b>Response</b><div>'+aiEscapeHtml(data?.response||'No response returned.')+'</div></div>';
+  }else{
+    html+=providerTestRow('Prompt tokens',data?.tokens_in??diag.tokens_in??0)+providerTestRow('Visible output tokens',data?.tokens_out??diag.tokens_out??0)+providerTestRow('Thinking tokens',data?.thinking_tokens??diag.thinking_tokens??0)+providerTestRow('Total tokens',data?.total_tokens??diag.total_tokens??0);
+    html+=providerTestRow('Finish reason',data?.finish_reason||diag.finish_reason||'')+providerTestRow('Thinking mode',diag.thinking_mode||'');
+    html+=providerTestRow('Models discovered',data?.model_count??diag.model_count??'');
+    html+=providerTestRow('Error type',diag.error_type||'')+providerTestRow('HTTP status',data?.http_status||diag.http_status||'');
+    html+=providerTestRow('Request',diag.request_method&&diag.request_url?(diag.request_method+' '+diag.request_url):(diag.request_url||''));
+    html+=providerTestRow('Provider detail',diag.provider_detail||'');
+    html+='</div><div class="provider-test-popup-error"><b>Error</b><div>'+aiEscapeHtml(error||data?.error||'Provider test failed.')+'</div></div>';
+    if(diag.server_response)html+='<div class="provider-test-popup-response"><b>Server response</b><div>'+aiEscapeHtml(diag.server_response)+'</div></div>';
+    if(diag.hint)html+='<div class="notice warn provider-test-popup-hint"><b>Troubleshooting</b><div>'+aiEscapeHtml(diag.hint)+'</div></div>';
+  }
+  body.innerHTML=html;openModal('provider-test-modal');
+}
+async function testProviderConfiguration(provider,button){
+  const row=providerRow(provider),model=row?.querySelector('[data-provider-model]')?.value||'';
+  const original=button.textContent;button.disabled=true;button.textContent='Testing ...';button.setAttribute('aria-busy','true');
+  try{
+    const payload=providerRequestData(provider);payload.set('model',model);
+    const resp=await fetch('{% url "ai_provider_test_live" %}',{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'Content-Type':'application/x-www-form-urlencoded'},body:payload.toString()});
+    let data={};try{data=await resp.json()}catch(e){data={ok:false,error:'The provider test returned an unreadable response.'}}
+    if(Array.isArray(data.models)){populateProviderModels(provider,data.models);if(provider==='ollama')updateProviderModelTags(provider,data.models)}
+    if(!resp.ok||!data.ok){showProviderTestResult(provider,data,data.error||'Provider test failed.');return}
+    exposeResolvedCloudModel(provider,data.model||'',data.web_research||'');
+    showProviderTestResult(provider,data);
+  }catch(err){showProviderTestResult(provider,{ok:false,requested_model:model||'Automatic',diagnostics:{provider}},err.message||String(err))}
+  finally{button.disabled=false;button.textContent=original;button.removeAttribute('aria-busy');updateProviderTestButton(provider)}
+}
+
+async function saveProviderConfiguration(event){
+  event.preventDefault();const form=event.currentTarget,button=document.getElementById('provider-save-button'),out=document.getElementById('provider-save-result');
+  button.disabled=true;button.setAttribute('aria-busy','true');setProviderResult(out,'Saving…');
+  try{
+    const resp=await fetch('{% url "ai_provider_save" %}',{method:'POST',headers:{'X-CSRFToken':aiCsrf()},body:new FormData(form)});const data=await resp.json();
+    if(!resp.ok||!data.ok)throw new Error(data.error||'Unable to save provider configuration.');
+    document.querySelectorAll('[data-provider-api-key]').forEach(input=>{input.value='';if(data.key_saved?.[input.dataset.providerApiKey])input.placeholder='Saved key — leave blank to keep'});
+    const mode=document.getElementById('discovery-mode-select');
+    if(mode&&data.discovery_mode){mode.dataset.current=data.discovery_mode;mode.value=data.discovery_mode}
+    setCloudDiscoveryAvailability(!!data.cloud_available);
+    setProviderResult(out,(data.message||'Provider configuration saved.')+(data.warning?' '+data.warning:''),data.warning?'warning-text':'success-text');
+  }catch(err){setProviderResult(out,err.message||String(err),'danger-text')}
+  finally{button.disabled=false;button.removeAttribute('aria-busy')}
+}
+const cloudModelCache={};
+const cloudModelLoadErrors={};
+async function cloudModelsForProvider(provider,{refresh=false}={}){
+  if(!provider)return [];
+  if(!refresh&&Array.isArray(cloudModelCache[provider])&&cloudModelCache[provider].length)return cloudModelCache[provider];
+  const payload=providerRequestData(provider);payload.set('provider',provider);
+  try{
+    const resp=await fetch('{% url "ai_provider_validate" %}',{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'Content-Type':'application/x-www-form-urlencoded'},body:payload.toString()});
+    const data=await resp.json();if(!resp.ok||!data.ok)throw new Error(data.error||'Unable to load provider models.');
+    cloudModelCache[provider]=Array.isArray(data.models)?data.models:[];delete cloudModelLoadErrors[provider];return cloudModelCache[provider];
+  }catch(err){cloudModelLoadErrors[provider]=err.message||String(err);return cloudModelCache[provider]||[]}
+}
+function fillCloudStageSelect(select,models,current){
+  if(!select)return;const keep=current||select.value||select.dataset.current||'';select.innerHTML='';
+  (models||[]).forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.label||m.id;if(m.id===keep)o.selected=true;select.appendChild(o)});
+  if(keep&&![...select.options].some(o=>o.value===keep)){const o=document.createElement('option');o.value=keep;o.textContent=keep;o.selected=true;select.prepend(o)}
+  if(!select.options.length){const o=document.createElement('option');o.value=keep||'';o.textContent=keep||'Provider catalogue unavailable';o.selected=true;select.appendChild(o)}
+}
+function selectCloudModel(select,value){
+  if(!select)return;const desired=String(value||'');if(!desired)return;
+  if(![...select.options].some(o=>o.value===desired)){const o=document.createElement('option');o.value=desired;o.textContent=desired;select.appendChild(o)}
+  select.value=desired;select.dataset.current=desired;
+}
+async function loadCloudStageRow(row,{refresh=false}={}){
+  const provider=row?.querySelector('.cloud-stage-provider')?.value||'',primary=row?.querySelector('.cloud-stage-primary'),secondary=row?.querySelector('.cloud-stage-secondary');if(!provider||!primary||!secondary)return;
+  const currentPrimary=primary.value||primary.dataset.current||'',currentSecondary=secondary.value||secondary.dataset.current||'';
+  const models=await cloudModelsForProvider(provider,{refresh});fillCloudStageSelect(primary,models,currentPrimary);fillCloudStageSelect(secondary,models,currentSecondary);
+}
+async function loadCloudStageModels(){
+  const groups={};document.querySelectorAll('.cloud-routing-table tr[data-cloud-stage]').forEach(row=>{const p=row.querySelector('.cloud-stage-provider')?.value||'';(groups[p]||(groups[p]=[])).push(row)});
+  for(const [provider,rows] of Object.entries(groups)){if(!provider)continue;await cloudModelsForProvider(provider);for(const row of rows)await loadCloudStageRow(row)}
+}
+async function saveCloudSelection(event){
+  event.preventDefault();const form=event.currentTarget,button=document.getElementById('cloud-selection-save'),out=document.getElementById('cloud-selection-result');
+  for(const row of document.querySelectorAll('.cloud-routing-table tr[data-cloud-stage]')){const stage=row.dataset.cloudStage,p=row.querySelector('.cloud-stage-provider')?.value||'',a=row.querySelector('.cloud-stage-primary')?.value||'',b=row.querySelector('.cloud-stage-secondary')?.value||'';if(!p||!a||!b){setProviderResult(out,(stage||'Stage')+': choose provider, Primary and Failover.','danger-text');return}if(a===b){setProviderResult(out,(stage||'Stage')+': Primary and Failover must be different.','danger-text');return}}
+  button.disabled=true;setProviderResult(out,'Saving Cloud Web stage routing…');
+  try{const resp=await fetch(location.pathname,{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'X-Requested-With':'fetch'},body:new FormData(form)});const data=await resp.json();if(!resp.ok||!data.ok)throw new Error(data.error||'Unable to save Cloud stage routing.');setProviderResult(out,data.message||'Cloud Web stage routing saved.','success-text');document.getElementById('cloud-selection-warning')?.remove()}catch(err){setProviderResult(out,err.message||String(err),'danger-text')}finally{button.disabled=false}
+}
+function openCloudAutoDetectModal(){openModal('cloud-auto-detect-modal')}
+function chooseCloudAutoProvider(){const provider=document.getElementById('cloud-auto-provider')?.value||'';if(!provider){portalAlert('Enable and choose a Cloud provider first.');return}closeModal('cloud-auto-detect-modal');autoSelectCloudModels(provider)}
+async function autoSelectCloudModels(provider){
+  const out=document.getElementById('cloud-selection-result'),button=document.getElementById('cloud-selection-auto'),rows=[...document.querySelectorAll('.cloud-routing-table tr[data-cloud-stage]')];if(!rows.length)return;button.disabled=true;
+  try{
+    setProviderResult(out,'Preparing documented cost-aware defaults for '+provider+'…');
+    const payload=new URLSearchParams({action:'auto_detect_cloud_routes',cloud_web_provider:String(provider||'')});
+    const resp=await fetch(location.pathname,{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'X-Requested-With':'fetch','Content-Type':'application/x-www-form-urlencoded'},body:payload.toString()});
+    const data=await resp.json();if(!resp.ok||!data.ok)throw new Error(data.error||'Auto-detect failed.');
+    for(const row of rows){const stage=row.dataset.cloudStage,route=(data.routes||{})[stage]||{},providerSelect=row.querySelector('.cloud-stage-provider'),primary=row.querySelector('.cloud-stage-primary'),secondary=row.querySelector('.cloud-stage-secondary'),cached=cloudModelCache[provider]||[];if(providerSelect)providerSelect.value=provider;if(cached.length){fillCloudStageSelect(primary,cached,route.primary);fillCloudStageSelect(secondary,cached,route.secondary)}selectCloudModel(primary,route.primary);selectCloudModel(secondary,route.secondary);invalidatePipelineStage(row,'Not tested after Auto-detect')}
+    updatePipelineLastTest(null,true);setProviderResult(out,'','')
+  }catch(err){setProviderResult(out,err.message||String(err),'danger-text')}finally{button.disabled=false}
+}
+async function testCloudSelection(){
+  if(discoveryActionBusy)return;
+  const out=document.getElementById('cloud-selection-result'),button=document.getElementById('cloud-selection-test'),form=document.getElementById('cloud-selection-form');
+  for(const row of document.querySelectorAll('.cloud-routing-table tr[data-cloud-stage]')){const stage=row.dataset.cloudStage,p=row.querySelector('.cloud-stage-provider')?.value||'',a=row.querySelector('.cloud-stage-primary')?.value||'',b=row.querySelector('.cloud-stage-secondary')?.value||'';if(!p||!a||!b){setProviderResult(out,(stage||'Stage')+': choose provider, Primary and Failover.','danger-text');return}if(a===b){setProviderResult(out,(stage||'Stage')+': Primary and Failover must be different.','danger-text');return}}
+  if(!await portalConfirm('Run Test Selection now? ScoutBox will save the Cloud Web stage routing and token caps currently shown, then validate the exact saved Primary/Failover routes each stage will use.','Confirm selection test','Save and test'))return;
+  button.disabled=true;
+  try{
+    setProviderResult(out,'Saving Cloud Web stage routing…');
+    const save=await fetch(location.pathname,{method:'POST',headers:{'X-CSRFToken':aiCsrf(),'X-Requested-With':'fetch'},body:new FormData(form)});let saved={};try{saved=await save.json()}catch(e){}if(!save.ok||!saved.ok)throw new Error(saved.error||'Unable to save Cloud stage routing.');
+    markPipelineModelTestQueued();
+    await queueAiTest({test:'pipeline_models',discovery_mode:'cloud_web'},out);
+  }catch(err){setProviderResult(out,err.message||String(err),'danger-text')}finally{button.disabled=false}
+}
+
+async function openDiscoveryTestModal(){
+  // Viewing an in-progress test is always allowed; only starting a second test is blocked.
+  openModal('discovery-test-modal');
+}
+
+async function runDiscoveryTest(){
+  if(discoveryActionBusy)return;
+  const keywordInput=document.getElementById('discovery-test-keyword'),errorEl=document.getElementById('discovery-test-keyword-error');
+  const keyword=(keywordInput?.value||'').trim();
+  if(errorEl)errorEl.textContent='';
+  if(keyword.length<3){if(errorEl)errorEl.textContent='Enter at least 3 characters for the test request.';keywordInput?.focus();return}
+  if(keyword.length>240){if(errorEl)errorEl.textContent='Keep the test request to 240 characters or fewer.';keywordInput?.focus();return}
+  const providerSelect=document.getElementById('discovery-test-provider');
+  const cloudMode={{ discovery_test_uses_cloud|yesno:'true,false' }};
+  const chosen=providerSelect?providerSelect.value:'';
+  if(!chosen){portalAlert(cloudMode?'No configured Cloud route is available for Test Discovery.':'No configured search engine is available for Test Discovery.');return}
+  const providerLabel=providerSelect?(providerSelect.options[providerSelect.selectedIndex]?.textContent||'the selected discovery route').replace(/^[✓!∅]\s*/, ''):'the selected discovery route';
+  if(!await portalConfirm('Run Test Discovery for “'+keyword+'” with '+providerLabel+'? ScoutBox will issue live discovery requests but will not save Opportunities or possible contacts.','Confirm Discovery test','Run Test Discovery'))return;
+  const out=document.getElementById('discovery-test-result');await queueAiTest({test:'discovery',search_source_id:cloudMode?'':chosen,cloud_route_lane:cloudMode?chosen:'primary',keyword},out);
+}
+
+function splitModelChoice(value){const raw=String(value||'');const at=raw.indexOf('|');return at<0?{provider:'',model:''}:{provider:raw.slice(0,at),model:raw.slice(at+1)}}
+function collectPipelineSelections(){const routes={};document.querySelectorAll('.pipeline-routing-table tr[data-pipeline-stage]').forEach(row=>{const stage=row.dataset.pipelineStage;if(!stage)return;const p=splitModelChoice(row.querySelector('select[name="route_'+stage+'"]')?.value||'');const f=splitModelChoice(row.querySelector('select[name="fallback_'+stage+'"]')?.value||'');routes[stage]={provider:p.provider,model:p.model,fallback_provider:f.provider,fallback_model:f.model,max_input_tokens:Number(row.querySelector('input[name="max_input_'+stage+'"]')?.value||0),max_output_tokens:Number(row.querySelector('input[name="max_output_'+stage+'"]')?.value||0)}});return routes}
+function invalidatePipelineStage(row,label='Not tested after selection change'){const icon=row?.querySelector('.pipeline-stage-status');if(icon){icon.className='pipeline-stage-status unknown';icon.textContent='?';icon.title=label;icon.setAttribute('aria-label',label)}row?.querySelectorAll('.pipeline-route-status').forEach(routeIcon=>paintRouteStatus(routeIcon,'unknown',label));const link=row?.querySelector('.pipeline-stage-link');if(link){link.disabled=true;link.classList.add('untested');delete link.dataset.stageResult}}
+async function applyPipelinePreset(mode){if(discoveryActionBusy)return;const preset=pipelinePresets?.[mode]||{};if(!preset.ok){portalAlert(preset.message||'This preset is not available.');return}const names={local:'Auto-detect'};const warning=preset.warning?String(preset.warning)+'\n\n':'';if(!await portalConfirm(warning+(names[mode]||'Preset')+' will change the selections on this page only. Nothing is saved until you click Save; leaving the page discards the changes.','Change selections','Apply'))return;Object.entries(preset.routes||{}).forEach(([stage,route])=>{const row=document.querySelector('.pipeline-routing-table tr[data-pipeline-stage="'+CSS.escape(stage)+'"]');if(!row)return;const primary=row.querySelector('select[name="route_'+stage+'"]'),fallback=row.querySelector('select[name="fallback_'+stage+'"]'),maxin=row.querySelector('input[name="max_input_'+stage+'"]'),maxout=row.querySelector('input[name="max_output_'+stage+'"]');if(primary&&!primary.disabled)primary.value=(route.provider&&route.model)?route.provider+'|'+route.model:'';if(fallback&&!fallback.disabled)fallback.value=(route.fallback_provider&&route.fallback_model)?route.fallback_provider+'|'+route.fallback_model:'';if(maxin&&!maxin.disabled&&route.max_input_tokens)maxin.value=route.max_input_tokens;if(maxout&&!maxout.disabled&&route.max_output_tokens)maxout.value=route.max_output_tokens;invalidatePipelineStage(row)});updatePipelineLastTest(null,true);const out=document.getElementById('pipeline-model-test-result');if(out){if(preset.warning){out.className='notice warn';out.textContent=String(preset.warning)}else{out.className='inline-result';out.textContent=''}}}
+function markPipelineModelTestQueued(){document.querySelectorAll('.pipeline-routing-table tr[data-pipeline-stage]').forEach((row,index)=>{const active=index===0,state=active?'testing':'queued',label=active?'Testing…':'Queued for validation';const icon=row.querySelector('.pipeline-stage-status');if(icon){icon.className='pipeline-stage-status '+state;icon.textContent=active?'↻':'…';icon.title=label;icon.setAttribute('aria-label',label)}row.querySelectorAll('.pipeline-route-status').forEach(routeIcon=>paintRouteStatus(routeIcon,state,label))})}
+async function runPipelineModelTest(){
+  if(discoveryActionBusy)return;
+  if(!await portalConfirm('Run Test Selection now? ScoutBox will save the routing/model selections and token caps currently shown on this page first, then test that saved configuration. This keeps the stored test status consistent with the configuration campaigns will use.','Confirm selection test','Save and test'))return;
+  const out=document.getElementById('pipeline-model-test-result');
+  markPipelineModelTestQueued();
+  await queueAiTest({test:'pipeline_models',routes_json:JSON.stringify(collectPipelineSelections()),discovery_mode:document.getElementById('discovery-mode-select')?.value||''},out);
+}
+
+function showDiscoverySummary(raw,error){
+  let d={};try{d=JSON.parse(raw||'{}')}catch(e){d={raw_parse_error:String(e)}}
+  const b=document.getElementById('discovery-summary-body');b.innerHTML='';
+  const add=(k,v)=>{if(v===undefined||v===null||v===''||(Array.isArray(v)&&!v.length))return;const row=document.createElement('div');row.className='kv';const strong=document.createElement('b');strong.textContent=k;const span=document.createElement('span');span.textContent=Array.isArray(v)?v.join(', '):String(v);row.append(strong,span);b.appendChild(row)};
+  add('Mode',d.mode);add('Test request',d.criteria?.test_keyword||d.test_keyword);if(d.criteria?.cloud_research_instruction)add('Cloud research instruction',d.criteria.cloud_research_instruction);add(d.mode==='cloud_web'?'Cloud provider':'Search engine',d.selected_provider);add('Profile terms',d.criteria?.profile_terms);add('Role families',d.criteria?.role_families);add('Queries',d.queries);if(error)add('Failure',error);
+  if(d.state==='limit_reached'){const n=document.createElement('div');n.className='notice warn limit-reached-result';const icon=document.createElement('span');icon.className='empty-gauge-icon';icon.setAttribute('aria-hidden','true');const text=document.createElement('span');text.textContent=' Not executed — '+(d.message||d.detail||'Cloud AI safety limit reached.');n.append(icon,text);b.appendChild(n);add('Limit',d.name||d.limit_name);if(d.used!==undefined)add('Usage',String(d.used)+' / '+String(d.limit));}
+  const h=document.createElement('h4');h.textContent='Stage diagnostics';b.appendChild(h);
+  let stages=Array.isArray(d.stages)?d.stages:[];
+  if(!stages.length){stages=[{stage:'Discovery run',status:error?'error':'no structured trace',detail:'This run did not store stage-level output. The fallback diagnostic below preserves the provider/query/error data that is available.',output:{mode:d.mode||'',queries:d.queries||[],errors:d.errors||[],criteria:d.criteria||{},result_count:Array.isArray(d.results)?d.results.length:0}}]}
+  stages.forEach(stage=>{const box=document.createElement('details');box.className='advanced discovery-stage-detail';box.open=stage.status==='error'||stage.status==='warning'||stage.status==='no structured trace';const sum=document.createElement('summary');sum.textContent=(stage.stage||'Stage')+' · '+(stage.status||'')+(stage.detail?' · '+stage.detail:'');box.appendChild(sum);const pre=document.createElement('pre');pre.className='raw-response';pre.textContent=JSON.stringify(stage.output||{},null,2);box.appendChild(pre);b.appendChild(box)});
+  const rawBox=document.createElement('details');rawBox.className='advanced discovery-stage-detail';const rawSum=document.createElement('summary');rawSum.textContent='Raw diagnostic result';const rawPre=document.createElement('pre');rawPre.className='raw-response';rawPre.textContent=JSON.stringify(d,null,2);rawBox.append(rawSum,rawPre);b.appendChild(rawBox);
+  const results=Array.isArray(d.results)?d.results:[];if(results.length){const rh=document.createElement('h4');rh.textContent='Returned results';b.appendChild(rh);const table=document.createElement('table');table.className='table-compact';table.innerHTML='<thead><tr><th>Provider</th><th>Title</th><th>URL</th></tr></thead>';const tb=document.createElement('tbody');results.forEach(x=>{const tr=document.createElement('tr'),a=document.createElement('a');a.href=x.url||'#';a.target='_blank';a.rel='noreferrer';a.textContent=x.title||x.url||'Result';const td1=document.createElement('td'),td2=document.createElement('td'),td3=document.createElement('td');td1.textContent=x.provider||'';td2.appendChild(a);td3.textContent=x.url||'';tr.append(td1,td2,td3);tb.appendChild(tr)});table.appendChild(tb);b.appendChild(table)}else if(d.state!=='limit_reached'){const n=document.createElement('div');n.className='notice warn';n.textContent='No results were returned. Expand Stage diagnostics and Raw diagnostic result above to inspect the provider/query path, errors and recorded output.';b.appendChild(n)}openModal('discovery-summary')
+}
+
+function updateDiscoveryTestProviderHint(){
+  const select=document.getElementById('discovery-test-provider'),hint=document.getElementById('discovery-test-provider-hint');if(!select||!hint||select.disabled)return;
+  const option=select.options[select.selectedIndex];if(!option){hint.textContent='';return}
+  const state=option.dataset.health||'no_results',labels={ok:'OK',warning:'Warning',no_results:'No recent results'};hint.textContent=(labels[state]||state)+(option.dataset.healthTitle?' · '+option.dataset.healthTitle:'');
+}
+
+async function changeDiscoveryMode(select){const previous=select.dataset.current||'source_guided',next=select.value;if(next===previous)return;const label=select.options[select.selectedIndex]?.textContent||next;if(!await portalConfirm('Change Discovery mode to '+label+'? ScoutBox will reload this page so routing and provider state stay in sync.')){select.value=previous;return}const status=document.getElementById('discovery-mode-status');const f=new FormData(document.getElementById('discovery-mode-form'));f.set('discovery_mode',next);select.disabled=true;if(status)status.textContent='Changing…';try{const r=await fetch(location.pathname,{method:'POST',body:f,headers:{'X-Requested-With':'fetch','X-CSRFToken':ScoutChat.csrf()}}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Unable to change Discovery mode');location.reload()}catch(e){select.value=previous;select.disabled=false;if(status)status.textContent=e.message||String(e)}}
+
+document.getElementById('discovery-mode-select')?.addEventListener('change',function(){changeDiscoveryMode(this)});
+document.getElementById('discovery-test-provider')?.addEventListener('change',updateDiscoveryTestProviderHint);
+document.getElementById('discovery-test-keyword')?.addEventListener('input',()=>{const e=document.getElementById('discovery-test-keyword-error');if(e)e.textContent=''});
+document.getElementById('cloud-selection-form')?.addEventListener('submit',saveCloudSelection);
+document.querySelectorAll('.cloud-stage-provider').forEach(select=>select.addEventListener('change',async()=>{const row=select.closest('tr[data-cloud-stage]'),provider=select.value||'',primary=row?.querySelector('.cloud-stage-primary'),secondary=row?.querySelector('.cloud-stage-secondary');if(primary){primary.value='';primary.dataset.current=''}if(secondary){secondary.value='';secondary.dataset.current=''}try{await loadCloudStageRow(row,{refresh:true});const err=cloudModelLoadErrors[provider];if(err)setProviderResult(document.getElementById('cloud-selection-result'),'Could not load the full '+provider+' model catalogue: '+err+' Choose a saved/manual model after the provider catalogue becomes available.','muted')}catch(err){setProviderResult(document.getElementById('cloud-selection-result'),err.message||String(err),'danger-text')}}));
+['primary','secondary'].forEach(lane=>{const el=chatbotLaneElements(lane);el.provider?.addEventListener('change',()=>{invalidateChatbotTestStatus(lane);if(el.model){el.model.value='';el.model.dataset.current='';el.model.dataset.currentProvider=el.provider?.value||''}updateChatbotInternetOption(lane);loadChatbotModels(lane)});el.model?.addEventListener('change',()=>{el.model.dataset.current=el.model.value||'';el.model.dataset.currentProvider=el.provider?.value||'';invalidateChatbotTestStatus(lane)})});
+document.querySelectorAll('[data-provider-model]').forEach(select=>select.addEventListener('change',()=>updateProviderTestButton(select.dataset.providerModel)));
+document.querySelectorAll('.pipeline-stage-link').forEach(link=>link.addEventListener('click',()=>{if(!link.disabled&&link.dataset.stageResult)showPipelineStageResult(link.dataset.stageResult)}));
+document.querySelectorAll('.pipeline-routing-table tbody tr').forEach(row=>row.querySelectorAll('select,input').forEach(control=>control.addEventListener('change',()=>{
+  invalidatePipelineStage(row,'Not tested after selection change');
+  updatePipelineLastTest(null,true);
+})));
+document.addEventListener('DOMContentLoaded',()=>{updateDiscoveryTestProviderHint();if(document.getElementById('cloud-selection-form'))loadCloudStageModels();if(document.getElementById('chatbot-model')){updateChatbotInternetOption('primary');updateChatbotInternetOption('secondary');loadChatbotModels('primary');loadChatbotModels('secondary');}
+  if(activePipelineModelJobId){
+    const out=document.getElementById('pipeline-model-test-result')||document.getElementById('cloud-selection-result');setDiscoveryActionsBusy(true,'Resuming selection test…');pollAiJob(activePipelineModelJobId,{test:'pipeline_models'},out).catch(err=>{if(out){out.className='notice danger';out.textContent=err?.message||String(err)}});
+  }else if(activeDiscoveryTestJobId){
+    const out=document.getElementById('discovery-test-result');setDiscoveryActionsBusy(true,'Resuming Test Discovery…',true);pollAiJob(activeDiscoveryTestJobId,{test:'discovery'},out).catch(()=>{});
+  }
+})
+</script>{% endblock %}

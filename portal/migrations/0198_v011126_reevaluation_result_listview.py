@@ -1,0 +1,16 @@
+from django.db import migrations
+
+
+def forwards(apps, schema_editor):
+    AuditLog = apps.get_model('portal', 'AuditLog')
+    if not AuditLog.objects.filter(action='version_upgraded', version='0.11.126').exists():
+        AuditLog.objects.create(
+            action='version_upgraded', version='0.11.126',
+            summary='ScoutBox upgraded to version 0.11.126.',
+            metadata={'release': '0.11.126'},
+        )
+
+
+class Migration(migrations.Migration):
+    dependencies = [('portal', '0197_v011125_reevaluation_history_restore_fix')]
+    operations = [migrations.RunPython(forwards, migrations.RunPython.noop)]

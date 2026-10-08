@@ -1,0 +1,183 @@
+{% extends 'portal/base.html' %}{% block content %}
+{% include 'portal/_system_tabs.html' %}
+
+<div class="settings-page-panels" data-settings-panels>
+<section id="settings-general" data-settings-panel><div class="grid">
+<div class="card span-7"><div class="body"><form method="post">{% csrf_token %}
+<label><input type="checkbox" name="digest_enabled" {% if portal_settings.digest_enabled %}checked{% endif %}> Daily digest enabled</label>
+<div class="form-row"><label>Digest time</label><div class="digest-time-actions"><div class="inline digest-time-inputs"><input type="number" min="0" max="23" name="digest_hour" value="{{portal_settings.digest_hour}}" style="width:80px">:<input type="number" min="0" max="59" name="digest_minute" value="{{portal_settings.digest_minute}}" style="width:80px"></div><button class="btn digest-test-button" type="submit" name="action" value="send_test_digest" onclick="return confirmSubmitter(this,'Send a test digest using the previous 24 hours of current ScoutBox data to the Daily digest recipient? This does not change the scheduled digest state.')">Send Test Digest Email</button></div></div>
+<div class="form-row"><label>Daily digest recipient</label><input class="general-compact-control" type="email" name="digest_recipient_email" value="{{portal_settings.digest_recipient_email}}" placeholder="admin@example.com"></div>
+<div class="form-row"><label>Portal Root URL</label><div class="field-with-action portal-root-compact-field"><input id="portal-root-url" type="url" name="portal_root_url" value="{{portal_settings.portal_root_url}}" placeholder="http://localhost:8989" required><button type="button" class="btn portal-root-detect" onclick="autoDetectPortalRoot()">Auto-detect</button></div></div>
+<div class="settings-subsection-title">Discovery &amp; Relevance</div>
+<div class="settings-subsection-hint">Defines how ScoutBox decides which discovered entries are relevant enough to keep.</div>
+<div class="form-row selectivity-row" id="settings-general-opportunity-selectivity"><label>Opportunity selectivity</label><div><select class="general-compact-control" name="opportunity_selectivity"><option value="broad" {% if portal_settings.opportunity_selectivity == 'broad' %}selected{% endif %}>Broad</option><option value="balanced" {% if portal_settings.opportunity_selectivity == 'balanced' %}selected{% endif %}>Balanced</option><option value="specialist" {% if portal_settings.opportunity_selectivity == 'specialist' %}selected{% endif %}>Specialist</option></select></div></div>
+<div class="form-row selectivity-row" id="settings-general-lead-selectivity"><label>Lead selectivity</label><div><select class="general-compact-control" name="lead_selectivity"><option value="broad" {% if portal_settings.lead_selectivity == 'broad' %}selected{% endif %}>Broad</option><option value="balanced" {% if portal_settings.lead_selectivity == 'balanced' %}selected{% endif %}>Balanced</option><option value="specialist" {% if portal_settings.lead_selectivity == 'specialist' %}selected{% endif %}>Specialist</option></select></div></div>
+<div class="form-row selectivity-row" id="settings-general-contact-selectivity"><label>Contact admission</label><div><select class="general-compact-control" name="contact_selectivity"><option value="broad" {% if portal_settings.contact_selectivity == 'broad' %}selected{% endif %}>Broad</option><option value="balanced" {% if portal_settings.contact_selectivity == 'balanced' %}selected{% endif %}>Balanced</option><option value="verified" {% if portal_settings.contact_selectivity == 'verified' %}selected{% endif %}>Verified</option></select></div></div>
+<div class="settings-subsection-title settings-subsection-title-spaced">General limits</div>
+<div class="form-row"><label>Max concurrent campaigns</label><div class="inline"><input type="number" min="2" max="10" name="max_concurrent_campaigns" value="{{portal_settings.max_concurrent_campaigns|default:5}}" style="width:110px"></div></div>
+<div class="form-row"><label>Exact-role duplicate window</label><div class="inline"><input type="number" min="1" name="duplicate_window_days" value="{{portal_settings.duplicate_window_days}}" style="width:110px"><span class="help">days</span></div></div>
+<div class="form-row"><label>Same-company cooldown</label><div class="inline"><input type="number" min="1" name="company_reapply_window_days" value="{{portal_settings.company_reapply_window_days}}" style="width:110px"><span class="help">days</span></div></div>
+<div class="form-row"><label>Different-role score penalty</label><input type="number" min="0" max="100" name="same_company_fit_penalty" value="{{portal_settings.same_company_fit_penalty}}" style="width:110px"></div>
+<div class="form-row"><label>Unknown-date score penalty</label><input type="number" min="0" max="100" name="same_company_unknown_date_penalty" value="{{portal_settings.same_company_unknown_date_penalty}}" style="width:110px"></div>
+<div class="form-row"><label>Deleted-draft suppression</label><div class="inline"><input type="number" min="1" name="draft_suppression_days" value="{{portal_settings.draft_suppression_days}}" style="width:110px"><span class="help">days</span></div></div>
+<div class="form-row"><label>Keep detailed logs for</label><div class="inline"><input type="number" min="14" max="180" name="detailed_log_retention_days" value="{{portal_settings.detailed_log_retention_days|default:90}}" style="width:110px"><span class="help">days</span></div></div>
+<div class="form-row"><label>Focus comparison records</label><input type="number" min="25" max="500" name="focus_comparison_records" value="{{portal_settings.focus_comparison_records|default:100}}" style="width:110px"></div>
+<div class="form-row"><label>Maximum focus groups</label><input type="number" min="5" max="30" name="max_focus_groups" value="{{portal_settings.max_focus_groups|default:15}}" style="width:110px"></div>
+<div class="section-actions"><button class="btn primary" name="action" value="save_system">Save configuration</button></div></form></div></div>
+</div></section>
+
+
+
+<section id="settings-tracking" data-settings-panel hidden><div class="grid">
+<div class="card span-8"><h3>External Statistics Connector</h3><div class="body">
+{% if not external_stats_status.ok %}<div class="notice warning"><b>External statistics unavailable.</b> The optional statistics service is not running or cannot be reached. ScoutBox will continue to operate normally; external click statistics will not be synchronized.</div>{% elif not external_stats_status.configured %}<div class="notice warning">External statistics service is running, but its data source is not configured.</div>{% endif %}
+<form method="post">{% csrf_token %}<input type="hidden" name="action" value="save_blog"><label><input type="checkbox" name="enabled" {% if blogcfg.enabled %}checked{% endif %}> Enable external statistics synchronization</label>
+<div class="blogstats-config-fields"><div class="form-row"><label>Host</label><input name="host" value="{{external_stats_cfg.host}}" placeholder="example.invalid"></div><div class="form-row"><label>Port</label><input class="blogstats-port" type="number" name="port" value="{{external_stats_cfg.port}}"></div><div class="form-row"><label>Database</label><input name="database" value="{{external_stats_cfg.database}}"></div><div class="form-row"><label>Read-only username</label><input name="username" value="{{external_stats_cfg.username}}"></div><div class="form-row"><label>Password</label><input type="password" name="password" placeholder="leave blank to keep saved"></div><div class="form-row"><label>Mode</label><select name="query_mode"><option value="native" {% if external_stats_cfg.query_mode == 'native' %}selected{% endif %}>Native schema</option><option value="view" {% if external_stats_cfg.query_mode == 'view' %}selected{% endif %}>Compatibility view</option><option value="direct" {% if external_stats_cfg.query_mode == 'direct' %}selected{% endif %}>Direct table mapping</option></select></div></div>
+<details class="advanced blogstats-compat"><summary>Compatibility mapping</summary><div class="form-row"><label>View name</label><input name="view_name" value="{{external_stats_cfg.view_name}}"></div><div class="form-row"><label>Table</label><input name="table_name" value="{{external_stats_cfg.table_name}}"></div><div class="form-row"><label>Method column / value</label><div class="inline blogstats-method"><input name="method_column" value="{{external_stats_cfg.method_column}}"><input name="method_value" value="{{external_stats_cfg.method_value}}"></div></div><div class="form-row"><label>Path column</label><input name="path_column" value="{{external_stats_cfg.path_column}}"></div><div class="form-row"><label>Timestamp column</label><input name="timestamp_column" value="{{external_stats_cfg.timestamp_column}}"></div><div class="form-row"><label>User-Agent column</label><input name="user_agent_column" value="{{external_stats_cfg.user_agent_column}}"></div><div class="form-row"><label>IP column</label><input name="ip_column" value="{{external_stats_cfg.ip_column}}"></div></details>
+<div class="section-actions"><button class="btn primary">Save connector</button></form><button type="button" class="btn" id="blog-readonly-test" onclick="testBlogReadonly()">Test connection</button></div><div id="blog-readonly-result" class="inline-result"></div></div></div>
+<div class="card span-4"><h3>Connector state</h3><div class="body"><div class="kv"><b>Enabled</b><span>{% if blogcfg.enabled %}Yes{% else %}No{% endif %}</span></div><div class="kv"><b>Service</b><span>{% if external_stats_status.ok %}Available{% else %}Unavailable{% endif %}</span></div><div class="kv"><b>Data source</b><span>{% if external_stats_status.configured %}Configured{% else %}Not configured{% endif %}</span></div><div class="kv"><b>Last sync</b><span>{{blogcfg.last_sync|date:'d/m/Y H:i:s'|default:'Never'}}</span></div></div></div>
+</div></section>
+
+<section id="settings-admins" class="settings-admins-compact" data-settings-panel hidden><div class="grid">
+<div class="card span-5"><h3>My account</h3><div class="body"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="rename_self"><div class="form-row"><label>Display name</label><input name="name" minlength="2" maxlength="150" value="{{request.user.first_name}}" required></div><button class="btn primary">Update name</button></form></div></div>
+<div class="card span-7"><h3>Add administrator</h3><div class="body"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="create_user"><div class="form-row"><label>Name</label><input name="name" minlength="2" maxlength="150" required></div><div class="form-row"><label>Email</label><input type="email" name="email" required></div><div class="form-row"><label>Initial password</label><input type="password" name="password" minlength="10" required></div><button class="btn success">Create administrator</button></form></div></div>
+<div class="card span-12"><h3>Administrator accounts</h3><div class="body"><table data-sort-table><tr><th>Name</th><th>Email</th><th>Active</th><th data-nosort>Actions</th></tr>{% for u in users %}<tr><td>{{u.first_name}}</td><td>{{u.email|default:u.username}}</td><td>{{u.is_active}}</td><td>{% if u.pk == request.user.pk %}<span class="muted">Current account</span>{% else %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="user_id" value="{{u.pk}}"><button class="btn small" name="action" value="toggle_user">{% if u.is_active %}Disable{% else %}Enable{% endif %}</button><button class="btn small danger" name="action" value="delete_user" onclick="return confirmSubmitter(this,'Delete this administrator account?')">Delete</button></form>{% endif %}</td></tr>{% endfor %}</table></div></div>
+</div></section>
+
+<section id="settings-maintenance" data-settings-panel hidden><div class="card full"><div class="body"><div class="maintenance-actions" id="maintenance-actions">
+<div class="maintenance-action-row"><button class="btn success diagnostic-export-open" id="diagnostic-export-open" type="button" onclick="openModal('export-diagnostics-modal');refreshDiagnosticExportEstimate()"><span data-diagnostic-export-label>Export Diagnostic Data</span><span class="diagnostic-export-spinner" aria-hidden="true" hidden></span></button><div class="maintenance-action-help">Download a support ZIP with discovery funnel/filter statistics, AI health, configuration state, retained telemetry and full Chatbot conversations. Raw search-result payloads and general AI request prompt/output bodies are excluded.</div></div>
+<div class="maintenance-action-row"><button class="btn warn" type="button" onclick="openModal('recover-operations-modal')">Recover Stalled Operations</button><div class="maintenance-action-help">Last-resort recovery for persistent campaign or worker stalls. Stops and releases in-flight task state, clears stale local-AI/search coordination locks, then restarts affected campaign passes and an interrupted Hidden Leads scan. Stored records and campaign definitions are preserved.</div></div>
+
+<div class="maintenance-action-row"><button class="btn danger" type="button" onclick="openModal('clear-discovery-modal')">Clear Opportunities / Hidden Leads</button><div class="maintenance-action-help">Remove generated discovery results so campaigns can rediscover them. Profile, resumes, configuration, blacklist rules and applied-role history are preserved.</div></div>
+<div class="maintenance-action-row"><button class="btn danger" type="button" onclick="openModal('clear-logs-modal')">Clear Audit &amp; Logs</button><div class="maintenance-action-help">Clear accumulated audit, completed task, usage, provider-statistic, resource, diagnostic and performance records without removing opportunity/application data.</div></div>
+<div class="maintenance-action-row"><button class="btn danger" type="button" onclick="openModal('reset-workspace-modal')">Reset Workspace Data</button><div class="maintenance-action-help">Reset operational workspace data such as campaigns, discoveries, applications, contacts, mail events and telemetry while preserving accounts, credentials/configuration and profile documents.</div></div>
+</div></div></div></section>
+</div>
+
+<div class="modal" id="export-diagnostics-modal" hidden onclick="if(event.target===this)closeModal('export-diagnostics-modal')"><div class="modal-card modal-form diagnostic-export-modal-card"><div class="modal-head"><b>Export Diagnostic Data</b><button type="button" class="icon-btn" id="diagnostic-export-close" onclick="closeModal('export-diagnostics-modal')">×</button></div><div class="modal-body"><form method="post" action="{% url 'export_diagnostic_data' %}" id="diagnostic-export-form" onsubmit="return beginDiagnosticExport(this)">{% csrf_token %}<div class="form-row diagnostic-export-period-row"><label>Time period</label><select name="period" id="diagnostic-export-period" onchange="refreshDiagnosticExportEstimate()"><option value="1h">Last 1 hour</option><option value="3h">Last 3 hours</option><option value="6h">Last 6 hours</option><option value="12h">Last 12 hours</option><option value="24h" selected>Last 24 hours</option><option value="3d">Last 3 days</option><option value="7d">Last 7 days</option><option value="14d">Last 2 weeks</option><option value="30d">Last 30 days</option><option value="all">All available data</option></select></div><div class="diagnostic-export-selections" id="diagnostic-export-selections">
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="context" checked onchange="diagnosticExportSelectionChanged()"> Configuration &amp; Campaign Context</span><strong data-diagnostic-size="context">estimating…</strong></label>
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="opportunities" checked onchange="diagnosticExportSelectionChanged()"> Opportunities &amp; Evidence</span><strong data-diagnostic-size="opportunities">estimating…</strong></label>
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="hidden_leads" checked onchange="diagnosticExportSelectionChanged()"> Hidden Leads</span><strong data-diagnostic-size="hidden_leads">estimating…</strong></label>
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="contacts" checked onchange="diagnosticExportSelectionChanged()"> Contacts, Applications &amp; Mail</span><strong data-diagnostic-size="contacts">estimating…</strong></label>
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="facebook" checked onchange="diagnosticExportSelectionChanged()"> Facebook &amp; Tracking</span><strong data-diagnostic-size="facebook">estimating…</strong></label>
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="search" checked onchange="diagnosticExportSelectionChanged()"> Search &amp; Provider Diagnostics</span><strong data-diagnostic-size="search">estimating…</strong></label>
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="discovery" checked onchange="diagnosticExportSelectionChanged()"> Discovery Funnel &amp; Filtering</span><strong data-diagnostic-size="discovery">estimating…</strong></label>
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="ai" checked onchange="diagnosticExportSelectionChanged()"> AI Request Diagnostics</span><strong data-diagnostic-size="ai">estimating…</strong></label>
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="resources" checked onchange="diagnosticExportSelectionChanged()"> Resource Usage</span><strong data-diagnostic-size="resources">estimating…</strong></label>
+<label class="checkbox-line"><span><input type="checkbox" name="category" value="operations" checked onchange="diagnosticExportSelectionChanged()"> Jobs, Errors &amp; Audit</span><strong data-diagnostic-size="operations">estimating…</strong></label>
+</div><div class="inline-result notice danger diagnostic-export-selection-error" id="diagnostic-export-selection-error" role="status" aria-live="polite" hidden>Select at least one export content type.</div><div class="diagnostic-export-estimate-total"><span>Total (uncompressed)</span><b id="diagnostic-export-estimated-total">estimating…</b></div><div class="section-actions"><button class="btn success" id="diagnostic-export-submit" type="submit">Prepare ZIP</button><button class="btn" id="diagnostic-export-cancel" type="button" onclick="closeModal('export-diagnostics-modal')">Cancel</button></div></form></div></div></div>
+<div class="modal" id="recover-operations-modal" hidden onclick="if(event.target===this)closeModal('recover-operations-modal')"><div class="modal-card modal-form"><div class="modal-head"><b>Recover Stalled Operations</b><button type="button" class="icon-btn" onclick="closeModal('recover-operations-modal')">×</button></div><div class="modal-body"><p class="maintenance-dialog-hint">Use only when campaigns or background work remain stuck after normal retries. ScoutBox will stop current in-flight campaign/background task state, clear stale local-AI and search-provider coordination locks, restart each affected campaign pass, and restart an interrupted Hidden Leads scan. Other one-off background actions are released but are not replayed automatically to avoid duplicate side effects. Existing Opportunities, Hidden Leads, Address Book contacts, Applications and campaign definitions are not deleted.</p><form method="post" onsubmit="return confirmFormSubmit(this,'Interrupt active work and recover stalled operations?')">{% csrf_token %}<input type="hidden" name="action" value="recover_stalled_operations"><div class="form-row"><label>Confirmation</label><input name="confirm_text" placeholder="Type RECOVER" required autocomplete="off"></div><div class="section-actions"><button class="btn warn">Recover Stalled Operations</button></div></form></div></div></div>
+<div class="modal" id="clear-discovery-modal" hidden onclick="if(event.target===this)closeModal('clear-discovery-modal')"><div class="modal-card modal-form"><div class="modal-head"><b>Clear Discovery Results</b><button type="button" class="icon-btn" onclick="closeModal('clear-discovery-modal')">×</button></div><div class="modal-body"><p class="maintenance-dialog-hint">Removes generated Opportunities and Hidden Leads so discovery can start clean. Candidate profile, Resumes, configuration, blacklist rules and historical applied roles are preserved.</p><form method="post" onsubmit="return confirmFormSubmit(this,'Clear generated Opportunities and Hidden Leads?')">{% csrf_token %}<input type="hidden" name="action" value="clear_trial_data"><div class="form-row"><label>Confirmation</label><input name="confirm_text" placeholder="Type CLEAR" required autocomplete="off"></div><div class="section-actions"><button class="btn danger">Clear</button></div></form></div></div></div>
+<div class="modal" id="clear-logs-modal" hidden onclick="if(event.target===this)closeModal('clear-logs-modal')"><div class="modal-card modal-form"><div class="modal-head"><b>Clear Audit &amp; Logs</b><button type="button" class="icon-btn" onclick="closeModal('clear-logs-modal')">×</button></div><div class="modal-body"><p class="maintenance-dialog-hint">Clears detailed audit entries, completed/failed task history, usage metrics, detailed resource samples, the hourly resource archive, diagnostics and performance-test records. Search-provider/day aggregates, Candidate profiles, Resumes, opportunities, applications, mail credentials and configuration are preserved.</p><form method="post" onsubmit="return confirmFormSubmit(this,'Clear accumulated logs and telemetry?')">{% csrf_token %}<input type="hidden" name="action" value="clear_logs"><div class="form-row"><label>Confirmation</label><input name="confirm_text" placeholder="Type CLEAR LOGS" required autocomplete="off"></div><div class="section-actions"><button class="btn danger">Clear Logs</button></div></form></div></div></div>
+<div class="modal" id="reset-workspace-modal" hidden onclick="if(event.target===this)closeModal('reset-workspace-modal')"><div class="modal-card modal-form"><div class="modal-head"><b>Reset Workspace Data</b><button type="button" class="icon-btn" onclick="closeModal('reset-workspace-modal')">×</button></div><div class="modal-body"><p class="maintenance-dialog-hint">Resets ScoutBox operational workspace data, including discovered opportunities, applications, campaigns, Hidden Leads, imports, contacts, mail events, jobs and telemetry. Accounts, credentials/configuration, profile documents and built-in rules are preserved.</p><form method="post" onsubmit="return confirmFormSubmit(this,'Reset workspace operational data?')">{% csrf_token %}<input type="hidden" name="action" value="reset_workspace_data"><div class="form-row"><label>Confirmation</label><input name="confirm_text" placeholder="Type RESET" required autocomplete="off"></div><div class="section-actions"><button class="btn danger">Reset Workspace Data</button></div></form></div></div></div>
+{% endblock %}
+{% block scripts %}<script>
+async function autoDetectPortalRoot(){
+  const field=document.getElementById('portal-root-url');if(!field)return;
+  const detected=String(window.location.origin||'').replace(/\/$/,'');
+  if(!detected)return portalAlert('ScoutBox could not determine the current browser address.');
+  const msg='Detected from the ScoutBox address currently open in this browser: '+detected+'\n\nThis may be a local or internal address and might not be reachable from the device where you open digest emails. Use this value in the Portal Root URL field?';
+  if(await portalConfirm(msg,'Auto-detect Portal Root URL','Use detected URL'))field.value=detected;
+}
+let diagnosticExportTimer=null;
+let diagnosticExportJobId=Number(localStorage.getItem('scoutboxDiagnosticExportJob')||0);
+function setDiagnosticExportBusy(busy){
+  const actions=[...document.querySelectorAll('#maintenance-actions button')];
+  actions.forEach(button=>button.disabled=busy);
+  const open=document.getElementById('diagnostic-export-open');
+  if(open){const label=open.querySelector('[data-diagnostic-export-label]'),spinner=open.querySelector('.diagnostic-export-spinner');if(label)label.textContent=busy?'Preparing…':'Export Diagnostic Data';if(spinner)spinner.hidden=!busy;if(!busy)open.removeAttribute('title')}
+  const submit=document.getElementById('diagnostic-export-submit');
+  if(submit){submit.disabled=busy;submit.textContent=busy?'Preparing…':'Prepare ZIP';}
+  const cancel=document.getElementById('diagnostic-export-cancel');
+  const close=document.getElementById('diagnostic-export-close');
+  if(cancel)cancel.disabled=busy;if(close)close.disabled=busy;
+}
+function finishDiagnosticExport(){
+  if(diagnosticExportTimer){clearInterval(diagnosticExportTimer);diagnosticExportTimer=null;}
+  diagnosticExportJobId=0;localStorage.removeItem('scoutboxDiagnosticExportJob');
+  setDiagnosticExportBusy(false);
+}
+function validateDiagnosticExportSelection(showError=true){
+  const form=document.getElementById('diagnostic-export-form');
+  if(!form)return false;
+  const selected=[...form.querySelectorAll('input[name="category"]')].some(x=>x.checked);
+  const error=document.getElementById('diagnostic-export-selection-error');
+  if(error)error.hidden=selected||!showError;
+  return selected;
+}
+function diagnosticFormatBytes(value){
+  const n=Math.max(0,Number(value||0));if(n<1024)return Math.round(n)+' B';
+  const units=['KB','MB','GB'];let x=n/1024,i=0;while(x>=1024&&i<units.length-1){x/=1024;i++}return (x>=100?x.toFixed(0):x>=10?x.toFixed(1):x.toFixed(2))+' '+units[i];
+}
+let diagnosticEstimateController=null;
+async function refreshDiagnosticExportEstimate(){
+  const form=document.getElementById('diagnostic-export-form');if(!form)return;
+  if(diagnosticEstimateController)diagnosticEstimateController.abort();diagnosticEstimateController=new AbortController();
+  const params=new URLSearchParams({period:form.elements.period?.value||'24h'});
+  [...form.querySelectorAll('input[name="category"]:checked')].forEach(box=>params.append('category',box.value));
+  try{
+    const r=await fetch('{% url "diagnostic_export_estimate" %}?'+params.toString(),{credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'},signal:diagnosticEstimateController.signal});
+    const data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'Unable to estimate export size');
+    Object.entries(data.sizes||{}).forEach(([key,value])=>{const node=document.querySelector('[data-diagnostic-size="'+CSS.escape(key)+'"]');if(node)node.textContent=diagnosticFormatBytes(value)});
+    const total=document.getElementById('diagnostic-export-estimated-total');if(total)total.textContent=diagnosticFormatBytes(data.total_bytes||0);
+  }catch(error){if(error?.name==='AbortError')return;const total=document.getElementById('diagnostic-export-estimated-total');if(total)total.textContent='estimate unavailable'}
+}
+function diagnosticExportSelectionChanged(){validateDiagnosticExportSelection(false);refreshDiagnosticExportEstimate()}
+
+async function pollDiagnosticExport(){
+  if(!diagnosticExportJobId)return;
+  try{
+    const response=await fetch('/jobs/'+diagnosticExportJobId+'/status/',{headers:{'Accept':'application/json'}});
+    const job=await response.json();
+    if(!response.ok)throw new Error(job.error||'Unable to check diagnostic export');
+    const open=document.getElementById('diagnostic-export-open');
+    if(open&&job.message)open.title=job.message;
+    if(!job.finished)return;
+    if(job.status==='completed'&&job.result&&job.result.download_url){
+      const url=job.result.download_url;finishDiagnosticExport();window.location.assign(url);return;
+    }
+    finishDiagnosticExport();portalAlert(job.error||job.message||'Diagnostic export failed.');
+  }catch(error){finishDiagnosticExport();portalAlert(error.message||String(error));}
+}
+function startDiagnosticExportPolling(jobId){
+  diagnosticExportJobId=Number(jobId||0);if(!diagnosticExportJobId)return;
+  localStorage.setItem('scoutboxDiagnosticExportJob',String(diagnosticExportJobId));setDiagnosticExportBusy(true);
+  if(diagnosticExportTimer)clearInterval(diagnosticExportTimer);
+  pollDiagnosticExport();diagnosticExportTimer=setInterval(pollDiagnosticExport,1000);
+}
+function beginDiagnosticExport(form){
+  if(!validateDiagnosticExportSelection(true))return false;
+  setDiagnosticExportBusy(true);closeModal('export-diagnostics-modal');
+  fetch(form.action,{method:'POST',body:new FormData(form),headers:{'X-CSRFToken':ScoutChat.csrf(),'Accept':'application/json'}})
+    .then(async response=>{const data=await response.json();if(!response.ok||!data.job_id)throw new Error(data.error||'Unable to queue diagnostic export');startDiagnosticExportPolling(data.job_id);})
+    .catch(error=>{finishDiagnosticExport();portalAlert(error.message||String(error));});
+  return false;
+}
+if(diagnosticExportJobId)startDiagnosticExportPolling(diagnosticExportJobId);
+async function testBlogReadonly(){const btn=document.getElementById('blog-readonly-test'),out=document.getElementById('blog-readonly-result');btn.disabled=true;out.className='inline-result notice';out.textContent='Testing…';try{const r=await fetch('{% url "blog_stats_test_async" %}',{method:'POST',headers:{'X-CSRFToken':ScoutChat.csrf(),'Content-Type':'application/x-www-form-urlencoded'},body:''});const d=await r.json();if(d.finished){out.className='inline-result notice '+(d.ok?'success':'danger');out.textContent=d.error||d.message||(d.ok?'Connection succeeded':'Connection failed');btn.disabled=false;return}if(!r.ok||!d.job_id)throw new Error(d.error||'Unable to run test');async function poll(){const j=await(await fetch('/jobs/'+d.job_id+'/status/')).json();out.className='inline-result notice '+(j.status==='completed'?'success':j.status==='failed'?'danger':'');out.textContent=j.error||j.message||j.status;if(!j.finished)setTimeout(poll,1000);else btn.disabled=false}poll()}catch(e){out.className='inline-result notice danger';out.textContent=e.message||String(e);btn.disabled=false}}
+(function(){
+  const panels=[...document.querySelectorAll('[data-settings-panels] > section[data-settings-panel]')];
+  const nav=[...document.querySelectorAll('[data-system-config-nav] a[data-settings-panel]')];
+  function openPanel(id){
+    if(!panels.some(x=>x.id===id)) id='settings-general';
+    panels.forEach(x=>x.hidden=x.id!==id);
+    nav.forEach(a=>a.classList.toggle('active',a.dataset.settingsPanel===id));
+  }
+  function panelForHash(hash){
+    const id=String(hash||'').replace(/^#/,'');
+    if(id.startsWith('settings-general-')) return 'settings-general';
+    return panels.some(x=>x.id===id)?id:'settings-general';
+  }
+  function openFromHash(){
+    const id=(location.hash||'').slice(1), panel=panelForHash(id);
+    openPanel(panel);
+    if(id&&id!==panel){requestAnimationFrame(()=>{const target=document.getElementById(id);if(target)target.scrollIntoView({block:'center'});});}
+  }
+  openFromHash();
+  nav.forEach(a=>a.addEventListener('click',e=>{
+    const target=a.dataset.settingsPanel;
+    if(a.pathname===location.pathname && target){e.preventDefault();history.replaceState(null,'','#'+target);openPanel(target);}
+  }));
+  window.addEventListener('hashchange',openFromHash);
+})();
+</script>{% endblock %}

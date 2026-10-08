@@ -1,0 +1,150 @@
+{% extends 'portal/base.html' %}{% load portal_extras %}
+{% block content %}
+{% include 'portal/_system_tabs.html' %}
+<div class="card full"><div class="body"><div class="toolbar compact-toolbar"><label for="email-profile-select"><b>Email profile</b></label><select id="email-profile-select" onchange="location.href='?template='+encodeURIComponent(this.value)"><option value="internal" {% if selected == 'internal' %}selected{% endif %}>Internal Development</option><option value="external" {% if selected == 'external' %}selected{% endif %}>External Mail</option></select>{% if profile.active %}<span class="tag green">Active</span>{% else %}<form method="post" class="inline-form">{% csrf_token %}<input type="hidden" name="template" value="{{selected}}"><button name="action" value="activate" class="btn success small">Make active</button></form>{% endif %}<span class="spacer"></span><a class="icon-btn" href="{% url 'email_history' %}" title="Open Email History">{% icon 'email' %}</a></div></div></div>
+
+<div class="tabs compact" data-tabs="mailcfg"><button type="button" data-tab-button="mailcfg" data-target="mailbox">Incoming</button><button type="button" data-tab-button="mailcfg" data-target="notification">Outgoing</button></div>
+
+<form method="post" id="email-save-form">{% csrf_token %}<input type="hidden" name="template" value="{{selected}}"><input type="hidden" name="action" value="save">
+<section id="mailbox" data-tab-panel="mailcfg"><div class="card full"><div class="body">
+<div class="settings-fields"><div><div class="form-row"><label>IMAP host</label><input name="imap_host" value="{{profile.imap_host}}" required></div><div class="form-row"><label>Port</label><input type="number" min="1" max="65535" name="imap_port" value="{{profile.imap_port}}" required></div><label class="inline-check"><input type="checkbox" name="imap_ssl" {% if profile.imap_ssl %}checked{% endif %}> Use IMAP SSL</label><div class="form-row"><label>Application email</label><input type="email" name="imap_email" value="{{profile.imap_email}}"></div><div class="form-row"><label>Username</label><input name="imap_username" value="{{profile.imap_username}}"></div><div class="form-row"><label>Password</label><input type="password" name="imap_password" placeholder="Leave blank to keep saved password"></div></div></div>
+<button class="btn primary top-gap">Save profile</button>
+<div class="top-gap" style="padding-top:14px" id="imap-browser">
+<div class="imap-browser-heading"><h3>IMAP Browser</h3><button type="button" class="icon-btn imap-refresh-icon" id="imap-refresh-button" onclick="loadFolders(false)" title="Refresh IMAP folders from the server" aria-label="Refresh IMAP folders from the server">{% icon 'refresh' %}</button><button type="button" class="icon-btn imap-detect-icon" id="imap-detect-button" onclick="loadFolders(true)" title="Detect Inbox, Drafts and Sent folder assignments" aria-label="Detect Inbox, Drafts and Sent folder assignments">{% icon 'folder_detect' %}</button><span id="imap-browser-status" class="muted" aria-live="polite"></span></div>
+<div class="settings-fields"><div>
+<div class="form-row"><label>Inbox folder</label><select name="inbox_folder" id="map-inbox" data-current="{{profile.inbox_folder}}"><option value="{{profile.inbox_folder}}">{{profile.inbox_folder}}</option></select></div>
+<div class="form-row"><label>Drafts folder</label><select name="drafts_folder" id="map-drafts" data-current="{{profile.drafts_folder}}"><option value="{{profile.drafts_folder}}">{{profile.drafts_folder}}</option></select></div>
+<div class="form-row"><label>Sent folder</label><select name="sent_folder" id="map-sent" data-current="{{profile.sent_folder}}"><option value="{{profile.sent_folder}}">{{profile.sent_folder}}</option></select></div>
+<div class="form-row"><label>Browse folder</label><select id="imap-folder" onchange="loadImapMessages()"><option value="">Loading…</option></select></div>
+<div class="imap-folder-save-row"><div class="imap-folder-save-control"><button type="button" class="btn primary" id="imap-folder-save-button" onclick="saveImapAssignments()">Save folder assignments</button></div></div>
+</div></div>
+<div class="table-wrap top-gap"><table id="imap-browser-table" class="table-compact" data-sort-table><thead><tr><th>Date</th><th>Sender</th><th>Recipients</th><th>Subject</th><th class="action-head">View</th></tr></thead><tbody><tr><td colspan="5" class="muted">Loading folders…</td></tr></tbody></table></div>
+<div class="section-actions imap-test-email-actions"><button type="button" class="btn success" id="imap-generate-button" onclick="generateTestEmails()">Generate Test Email</button></div></div>
+</div></div></section>
+
+<section id="notification" data-tab-panel="mailcfg" hidden><div class="card full"><div class="body">
+{% if selected == 'external' %}
+<div class="form-row"><label>Outgoing service</label><select name="outgoing_method" id="outgoing-method" onchange="updateOutgoingMethod(true)"><option value="smtp" {% if profile.outgoing_method != 'resend' %}selected{% endif %}>SMTP</option><option value="resend" {% if profile.outgoing_method == 'resend' %}selected{% endif %}>Resend API (resend.com)</option></select></div>
+{% else %}<input type="hidden" name="outgoing_method" value="smtp">{% endif %}
+<div id="smtp-config" {% if selected == 'external' and profile.outgoing_method == 'resend' %}hidden{% endif %}><h3 class="outgoing-subheading">SMTP Config</h3><div class="settings-fields"><div><div class="form-row"><label>SMTP host</label><input name="smtp_host" value="{{profile.smtp_host}}"></div><div class="form-row"><label>Port</label><input type="number" min="1" max="65535" name="smtp_port" value="{{profile.smtp_port}}"></div><label class="inline-check"><input type="checkbox" name="smtp_tls" {% if profile.smtp_tls %}checked{% endif %}> Use STARTTLS</label><div class="form-row"><label>Username</label><input name="smtp_username" value="{{profile.smtp_username}}"></div><div class="form-row"><label>Password</label><input type="password" name="smtp_password" placeholder="Leave blank to keep saved password"></div></div></div></div>
+{% if selected == 'external' %}<div id="resend-config" {% if profile.outgoing_method != 'resend' %}hidden{% endif %}><h3 class="outgoing-subheading">Resend Config</h3><p class="help">Uses the Resend HTTPS API at api.resend.com. Configure and verify the From domain in Resend first.</p><div class="form-row"><label>API key</label><input type="password" name="resend_api_key" autocomplete="new-password" placeholder="Leave blank to keep saved API key"></div></div>{% endif %}
+<div class="settings-fields"><div><div class="form-row"><label>Sender name</label><input name="notification_from_name" value="{{profile.notification_from_name}}"></div><div class="form-row"><label>From email</label><input type="email" name="notification_from_email" value="{{profile.notification_from_email}}"></div></div></div>
+<button class="btn primary top-gap">Save profile</button>
+<div class="top-gap outgoing-test-section" style="padding-top:14px"><h3 class="outgoing-subheading">{% if selected == 'external' %}Outgoing test{% else %}SMTP test{% endif %}</h3><p class="help" id="mail-test-help">Uses the current outgoing fields, saves that outgoing configuration, then sends immediately. The attempt is recorded in Email History as accepted/delivered or failed.</p><div class="form-row"><label>Recipient</label><input id="mail-test-recipient" type="email" value="{{request.user.email}}" required></div><div class="form-row"><label>Subject</label><div class="field-with-action"><input id="mail-test-subject" value="ScoutBox outgoing test"><button type="button" class="icon-btn" onclick="regenerateMailTest()" title="Regenerate test message">{% icon 'refresh' %}</button></div></div><div class="form-row mail-test-body-row"><label>Body</label><textarea id="mail-test-body"></textarea></div><div class="section-actions"><button type="button" class="btn success" onclick="runMailTest('send')">Send test email</button></div><div id="mail-test-result" class="inline-result"></div></div>
+</div></div></section>
+</form>
+
+<div class="modal" id="imap-message-modal" hidden onclick="if(event.target===this)closeModal('imap-message-modal')"><div class="modal-card imap-message-modal-card"><div class="modal-head"><b id="imap-msg-title">Email</b><button type="button" class="icon-btn" onclick="closeModal('imap-message-modal')">{% icon 'close' %}</button></div><div class="modal-body"><div class="mail-meta imap-mail-meta"><div><b>From:</b><span id="imap-msg-from"></span></div><div><b>To:</b><span id="imap-msg-to"></span></div><div><b>Date:</b><span id="imap-msg-date"></span></div><div><b>Folder:</b><span id="imap-msg-folder"></span></div></div><div class="tabs compact" data-tabs="imap-body"><button type="button" data-tab-button="imap-body" data-target="imap-html">HTML</button><button type="button" data-tab-button="imap-body" data-target="imap-text">Text</button></div><section id="imap-html" data-tab-panel="imap-body"><iframe id="imap-msg-html" class="email-preview-frame imap-email-preview-frame" sandbox="allow-popups allow-popups-to-escape-sandbox" title="Email HTML preview"></iframe></section><section id="imap-text" data-tab-panel="imap-body" hidden><pre id="imap-msg-text" class="mail-plain imap-mail-plain"></pre></section><div class="section-actions"><button type="button" class="btn danger" id="imap-delete-draft" disabled title="Delete Draft is available only in the configured Drafts folder">Delete Draft</button></div></div></div></div>
+{% endblock %}
+{% block scripts %}<script>
+function mailCsrf(){const m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);return m?decodeURIComponent(m[1]):''}
+function clearEmailConfigPageMessages(){document.querySelectorAll('.messages').forEach(box=>box.remove())}
+function currentOutgoingLabel(){const m=document.getElementById('outgoing-method');return m&&m.value==='resend'?'Resend API':'SMTP'}
+function updateOutgoingMethod(regenerate=false){const m=document.getElementById('outgoing-method');if(!m)return;const resend=m.value==='resend',smtp=document.getElementById('smtp-config'),rc=document.getElementById('resend-config');if(smtp)smtp.hidden=resend;if(rc)rc.hidden=!resend;const h=document.getElementById('mail-test-help');if(h)h.textContent='Uses the current '+currentOutgoingLabel()+' fields, saves that outgoing configuration, then sends immediately. The attempt is recorded in Email History as accepted/delivered or failed.';if(regenerate){const out=document.getElementById('mail-test-result');if(out){out.className='inline-result';out.textContent=''}regenerateMailTest()}}
+function regenerateMailTest(){const now=new Date(),stamp=now.toLocaleString('en-GB',{hour12:false}),via=currentOutgoingLabel();document.getElementById('mail-test-subject').value='ScoutBox '+via+' test · '+stamp;document.getElementById('mail-test-body').value='ScoutBox outgoing-mail test generated at '+stamp+'.\n\nIf you received this message, the '+via+' configuration is working.'}
+updateOutgoingMethod(false);regenerateMailTest();
+async function runMailTest(test){clearEmailConfigPageMessages();const out=document.getElementById('mail-test-result');out.className='notice';out.textContent='Saving outgoing configuration and sending test…';const saveForm=document.getElementById('email-save-form'),form=new URLSearchParams(new FormData(saveForm));form.set('test',test);form.set('recipient',document.getElementById('mail-test-recipient').value||'');form.set('subject',document.getElementById('mail-test-subject').value||'');form.set('body',document.getElementById('mail-test-body').value||'');try{const r=await fetch('{% url "email_profile_test_async" %}',{method:'POST',headers:{'X-CSRFToken':mailCsrf(),'Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});const d=await r.json();if(d.finished){out.className='notice '+(d.ok?'success':'danger');out.textContent=d.ok?(d.message||'Outgoing-mail test completed.'):(d.error||d.message||'Outgoing-mail test failed.');return}if(!r.ok||!d.job_id)throw new Error(d.error||'Unable to start test');async function poll(){const j=await(await fetch('/jobs/'+d.job_id+'/status/')).json();out.className='notice '+(j.status==='completed'?'success':j.status==='failed'?'danger':'');out.textContent=j.error||j.message||j.status;if(!j.finished)setTimeout(poll,1000)}poll()}catch(e){out.className='notice danger';out.textContent=e.message||String(e)}}
+function fillFolderSelect(sel,folders,current){sel.innerHTML='';folders.forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent=f;if(f===current)o.selected=true;sel.appendChild(o)})}
+function imapPreviewDocument(html,message=''){const content=String(html||'').trim();const fallback=message?'<div class="scoutbox-preview-state">'+String(message).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</div>':'<div class="scoutbox-preview-state">No HTML body.</div>';return '<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light"><base target="_blank"><style>html{background:#fff;color-scheme:light}body{box-sizing:border-box;margin:0;padding:16px;background:#fff;color:#111;font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow-wrap:anywhere}body *{box-sizing:border-box}img{max-width:100%;height:auto}.scoutbox-preview-state{color:#333;padding:16px;border:1px solid #ddd;border-radius:6px;background:#f7f7f7}</style></head><body>'+(content||fallback)+'</body></html>'}
+function setImapDeleteState(canDelete,folder='',uid=''){const del=document.getElementById('imap-delete-draft');if(!del)return;del.disabled=!canDelete;del.hidden=!canDelete;del.title=canDelete?'Delete this message from Drafts':'Delete Draft is available only in the configured Drafts folder';del.onclick=canDelete?(()=>deleteImapDraft(folder,uid)):null}
+function imapStatus(text='',kind=''){const status=document.getElementById('imap-browser-status');if(!status)return;status.textContent=text;status.className='muted'+(kind?' '+kind:'')}
+function setImapBusy(mode,busy){
+  const refresh=document.getElementById('imap-refresh-button'),detect=document.getElementById('imap-detect-button'),generate=document.getElementById('imap-generate-button'),save=document.getElementById('imap-folder-save-button');
+  if(refresh){refresh.disabled=busy;refresh.classList.toggle('is-busy',busy&&mode==='folders')}
+  if(detect){detect.disabled=busy;detect.classList.toggle('is-busy',busy&&mode==='folders')}
+  if(generate){generate.disabled=busy;generate.textContent=busy&&mode==='generate'?'Generating…':'Generate Test Email'}
+  if(save&&mode!=='save')save.disabled=busy;
+}
+function chooseImapFolder(folders,current,hints,fallback=''){
+  const rows=Array.isArray(folders)?folders:[],lower=new Map(rows.map(f=>[String(f).toLowerCase(),f])),wanted=String(current||'').trim();
+  if(wanted&&rows.includes(wanted))return wanted;
+  if(wanted&&lower.has(wanted.toLowerCase()))return lower.get(wanted.toLowerCase());
+  for(const hint of hints){if(lower.has(hint))return lower.get(hint)}
+  for(const f of rows){const key=String(f).toLowerCase();if(hints.some(h=>key.includes(h)))return f}
+  return fallback||rows[0]||wanted;
+}
+function applyImapFolders(folders){
+  const current={inbox:document.getElementById('map-inbox')?.value||'INBOX',drafts:document.getElementById('map-drafts')?.value||'Drafts',sent:document.getElementById('map-sent')?.value||'Sent'};
+  const mapping={
+    inbox:chooseImapFolder(folders,current.inbox,['inbox'],'INBOX'),
+    drafts:chooseImapFolder(folders,current.drafts,['draft','drafts'],'Drafts'),
+    sent:chooseImapFolder(folders,current.sent,['sent','sent items','sent mail'],'Sent'),
+  };
+  const preferred=[mapping.inbox,mapping.drafts,mapping.sent].filter(Boolean),rows=[...new Set([...preferred,...(folders||[])])];
+  ['inbox','drafts','sent'].forEach(k=>{const sel=document.getElementById('map-'+k);if(sel)fillFolderSelect(sel,rows,mapping[k])});
+  const browser=document.getElementById('imap-folder'),keep=browser.value;browser.innerHTML='';
+  const labels={};if(mapping.inbox)labels[mapping.inbox]='Inbox';if(mapping.drafts)labels[mapping.drafts]=(labels[mapping.drafts]?labels[mapping.drafts]+' / ':'')+'Drafts';if(mapping.sent)labels[mapping.sent]=(labels[mapping.sent]?labels[mapping.sent]+' / ':'')+'Sent';
+  rows.forEach(f=>{const o=document.createElement('option');o.value=f;o.textContent=labels[f]?(labels[f]+' — '+f):f;browser.appendChild(o)});
+  const chosen=(keep&&rows.includes(keep))?keep:(mapping.inbox||rows[0]||'');if(chosen)browser.value=chosen;
+  return {rows,mapping};
+}
+async function pollImapJob(jobId,onProgress){
+  const deadline=Date.now()+120000;
+  for(;;){
+    const r=await fetch('/jobs/'+encodeURIComponent(jobId)+'/status/',{cache:'no-store'}),j=await r.json();
+    if(!r.ok)throw new Error(j.error||'Unable to read background task status.');
+    if(onProgress)onProgress(j);
+    if(j.finished){if(j.status!=='completed')throw new Error(j.error||j.message||'Background task failed.');return j.result||{}}
+    if(Date.now()>deadline)throw new Error('Background IMAP task is taking longer than two minutes. Check the worker status.');
+    await new Promise(resolve=>setTimeout(resolve,700));
+  }
+}
+async function queueImapBrowserJob(action){
+  const form=document.getElementById('email-save-form'),payload=new URLSearchParams(new FormData(form));
+  payload.set('template','{{selected|escapejs}}');payload.set('action',action);
+  const r=await fetch('{% url "email_browser_api" %}',{method:'POST',headers:{'X-CSRFToken':mailCsrf(),'Content-Type':'application/x-www-form-urlencoded'},body:payload.toString(),cache:'no-store'}),d=await r.json();
+  if(!r.ok||!d.ok||!d.job_id)throw new Error(d.error||'Unable to start IMAP background task.');
+  return d.job_id;
+}
+async function saveImapAssignments(){
+  clearEmailConfigPageMessages();const button=document.getElementById('imap-folder-save-button'),original=button?.textContent||'Save folder assignments';
+  if(button){button.disabled=true;button.textContent='Saving…'}imapStatus('Saving folder assignments…');
+  try{
+    const form=document.getElementById('email-save-form'),payload=new URLSearchParams(new FormData(form));payload.set('template','{{selected|escapejs}}');payload.set('action','save_incoming');
+    const r=await fetch('{% url "email_browser_api" %}',{method:'POST',headers:{'X-CSRFToken':mailCsrf(),'Content-Type':'application/x-www-form-urlencoded'},body:payload.toString(),cache:'no-store'}),d=await r.json();
+    if(!r.ok||!d.ok)throw new Error(d.error||'Unable to save folder assignments.');
+    imapStatus(d.message||'Folder assignments saved.','success-text');
+  }catch(e){imapStatus('IMAP error: '+(e.message||String(e)),'danger-text')}
+  finally{if(button){button.disabled=false;button.textContent=original}}
+}
+async function loadFolders(mappingOnly=false,initial=false){
+  clearEmailConfigPageMessages();setImapBusy('folders',true);imapStatus(mappingOnly?'Detecting folders…':'Refreshing folders…');
+  try{
+    const jobId=await queueImapBrowserJob('folders_background');
+    const result=await pollImapJob(jobId,j=>{if(j.status==='queued')imapStatus('Folder refresh queued…');else if(j.status==='running')imapStatus(mappingOnly?'Detecting folders…':'Refreshing folders…')});
+    applyImapFolders(result.folders||[]);
+    // Refresh/detect status is intentionally transient: only show it while the
+    // background operation is actually running. Successful completion is obvious
+    // from the refreshed selectors/list and does not leave stale status text behind.
+    imapStatus('');
+    if(!mappingOnly&&document.getElementById('imap-folder')?.value)await loadImapMessages(true);
+  }catch(e){
+    imapStatus('IMAP error: '+(e.message||String(e)),'danger-text');
+    const body=document.querySelector('#imap-browser-table tbody');if(initial&&body)body.innerHTML='<tr><td colspan="5" class="danger-text"></td></tr>',body.querySelector('td').textContent=e.message||String(e);
+  }finally{setImapBusy('folders',false)}
+}
+async function loadImapMessages(preserveStatus=false){
+  clearEmailConfigPageMessages();const folder=document.getElementById('imap-folder').value,body=document.querySelector('#imap-browser-table tbody');if(!folder)return;
+  body.innerHTML='<tr><td colspan="5" class="muted">Loading…</td></tr>';
+  try{
+    const d=await(await fetch('{% url "email_browser_api" %}?template={{selected|urlencode}}&action=messages&folder='+encodeURIComponent(folder),{cache:'no-store'})).json();if(!d.ok)throw new Error(d.error);
+    body.innerHTML='';(d.messages||[]).forEach(m=>{const tr=document.createElement('tr');[m.date,m.sender,m.recipients,m.subject].forEach(v=>{const td=document.createElement('td');td.textContent=v||'';tr.appendChild(td)});const td=document.createElement('td'),b=document.createElement('button');b.type='button';b.className='icon-btn';b.title='View full email';b.innerHTML='{% icon "open" %}';b.onclick=()=>viewImapMessage(folder,m.uid);td.appendChild(b);tr.appendChild(td);body.appendChild(tr)});
+    if(!d.messages.length)body.innerHTML='<tr><td colspan="5" class="muted">No messages in this folder.</td></tr>';
+    if(!preserveStatus)imapStatus(d.messages.length+' message'+(d.messages.length===1?'':'s')+'.');
+  }catch(e){body.innerHTML='<tr><td colspan="5" class="danger-text"></td></tr>';body.querySelector('td').textContent=e.message;imapStatus('IMAP error: '+e.message,'danger-text')}
+}
+async function viewImapMessage(folder,uid){clearEmailConfigPageMessages();const frame=document.getElementById('imap-msg-html');document.getElementById('imap-msg-title').textContent='Loading email…';document.getElementById('imap-msg-from').textContent='Loading…';document.getElementById('imap-msg-to').textContent='';document.getElementById('imap-msg-date').textContent='';document.getElementById('imap-msg-folder').textContent=folder||'';if(frame)frame.srcdoc=imapPreviewDocument('','Loading email…');document.getElementById('imap-msg-text').textContent='Loading email…';const drafts=(document.getElementById('map-drafts')?.value||'Drafts').trim().toLowerCase(),requestedDraft=String(folder||'').trim().toLowerCase()===drafts;setImapDeleteState(false,folder,uid);openModal('imap-message-modal');initTabs();try{const d=await(await fetch('{% url "email_browser_api" %}?template={{selected|urlencode}}&action=message&folder='+encodeURIComponent(folder)+'&uid='+encodeURIComponent(uid),{cache:'no-store'})).json();if(!d.ok)throw new Error(d.error);const m=d.message;document.getElementById('imap-msg-title').textContent=m.subject||'(No subject)';document.getElementById('imap-msg-from').textContent=m.sender||'';document.getElementById('imap-msg-to').textContent=m.recipients||'';document.getElementById('imap-msg-date').textContent=m.date||'';document.getElementById('imap-msg-folder').textContent=m.folder||folder||'';if(frame)frame.srcdoc=imapPreviewDocument(m.body_html||'');document.getElementById('imap-msg-text').textContent=m.body_text||'(No text body.)';setImapDeleteState(Boolean(m.can_delete&&requestedDraft),m.folder,m.uid)}catch(e){document.getElementById('imap-msg-title').textContent='Unable to load email';document.getElementById('imap-msg-from').textContent='';if(frame)frame.srcdoc=imapPreviewDocument('',e.message||'Unable to load message.');document.getElementById('imap-msg-text').textContent=e.message||'Unable to load message.';setImapDeleteState(false,folder,uid)}}
+async function deleteImapDraft(folder,uid){clearEmailConfigPageMessages();if(!await portalConfirm('Delete this message from Drafts?'))return;const f=new URLSearchParams({template:'{{selected|escapejs}}',action:'delete',folder:folder,uid:uid});const d=await(await fetch('{% url "email_browser_api" %}',{method:'POST',headers:{'X-CSRFToken':mailCsrf(),'Content-Type':'application/x-www-form-urlencoded'},body:f.toString()})).json();if(!d.ok){portalAlert(d.error||'Delete failed');return}closeModal('imap-message-modal');loadImapMessages()}
+async function generateTestEmails(){
+  clearEmailConfigPageMessages();if(!await portalConfirm('Generate one timestamped IMAP test email in each configured Inbox, Drafts and Sent folder? This appends test messages to the mailbox but sends no external email.'))return;
+  setImapBusy('generate',true);imapStatus('Generating test emails…');
+  try{
+    const jobId=await queueImapBrowserJob('populate_test_background');
+    const result=await pollImapJob(jobId,j=>{imapStatus(j.status==='queued'?'Test-email generation queued…':'Generating test emails…')});
+    imapStatus(result.message||'Test emails generated.','success-text');
+    if(document.getElementById('imap-folder')?.value)await loadImapMessages(true);
+  }catch(e){imapStatus('IMAP error: '+(e.message||String(e)),'danger-text')}
+  finally{setImapBusy('generate',false)}
+}
+loadFolders(false,true);
+</script>{% endblock %}

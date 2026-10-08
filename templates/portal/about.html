@@ -1,0 +1,425 @@
+{% extends 'portal/base.html' %}{% load portal_extras %}{% block content %}
+<div class="about-scoutbox">
+  <div class="card full about-hero"><div class="body"><div><div class="about-hero-title-row"><h2>ScoutBox</h2><a class="about-export-docx-icon" data-docx-skip href="{% url 'about_export_docx' %}" title="Export to Word" aria-label="Export to Word">{% icon 'word' %}</a></div><p class="about-copyright"><span aria-hidden="true">©</span> 2026 ToughDev. All rights reserved.</p></div><div class="about-build"><b>v{{PORTAL_VERSION}}</b><span>Released on {{PORTAL_LAST_MODIFIED}}</span></div></div></div>
+  <div class="about-grid">
+    <div class="card about-cell"><h3 class="about-heading"><span class="about-icon">{% icon 'search' %}</span><span>What it does</span></h3><div class="body"><p>ScoutBox turns a candidate profile, active Resumes, engagement preferences and selected sources into a repeatable discovery pipeline. It searches for niche remote work and relevant companies, validates the underlying pages, and evaluates the evidence against the profile rather than treating every search hit as a lead.</p><p>Qualified results are consolidated into <b><a href="{% url 'opportunities' %}">Opportunities</a></b> for actionable roles or <b><a href="{% url 'cold_contact' %}">Hidden Leads</a></b> for companies worth researching or approaching. Application material and <b>Prepare Outreach</b> drafts then flow into <b><a href="{% url 'applications' %}">Applications &amp; Outreach</a></b>, where ScoutBox keeps company/role context, drafts, documents, status history, mailbox reconciliation and outcomes together.</p></div></div>
+    <div class="card about-cell about-workflow-cell"><h3 class="about-heading"><span class="about-icon">{% icon 'workflow' %}</span><span>Main workflow</span></h3><div class="body"><div class="workflow-steps"><div class="workflow-step"><span class="workflow-step-badge" aria-label="Step 1">{% icon 'step1' %}</span><span><b>Discover</b><small>Find candidate URLs from preferred sources and custom domains.</small></span></div><div class="workflow-step"><span class="workflow-step-badge" aria-label="Step 2">{% icon 'step2' %}</span><span><b>Validate</b><small>Confirm the target page is live and represents a real role or organization.</small></span></div><div class="workflow-step"><span class="workflow-step-badge" aria-label="Step 3">{% icon 'step3' %}</span><span><b>Analyse</b><small>Evaluate fit, remote eligibility, freshness and useful signals.</small></span></div><div class="workflow-step"><span class="workflow-step-badge" aria-label="Step 4">{% icon 'step4' %}</span><span><b>Review</b><small>Read and triage Opportunities and Hidden Leads.</small></span></div><div class="workflow-step"><span class="workflow-step-badge" aria-label="Step 5">{% icon 'step5' %}</span><span><b>Prepare</b><small>Create application or outreach material from the selected evidence.</small></span></div><div class="workflow-step"><span class="workflow-step-badge" aria-label="Step 6">{% icon 'step6' %}</span><span><b>Track</b><small>Follow application status, replies and outcomes.</small></span></div></div></div></div>
+    <div class="card about-cell"><h3 class="about-heading"><span class="about-icon">{% icon 'info' %}</span><span>Core concepts</span></h3><div class="body"><p><b><a href="{% url 'opportunities' %}">Opportunities</a></b> are actionable roles. <b><a href="{% url 'cold_contact' %}">Hidden Leads</a></b> surface relevant companies or needs before a formal role exists. <b><a href="{% url 'campaigns' %}">Campaigns</a></b> steer discovery. <b><a href="{% url 'sources' %}">Search Sources</a></b> control where ScoutBox looks and which Local discovery engines find initial URLs. <b><a href="{% url 'applications' %}">Applications &amp; Outreach</a></b> keeps prepared drafts, submitted applications, status history, role/company details, documents and mailbox reconciliation in one place.</p></div></div>
+    <div class="card about-cell"><h3 class="about-heading"><span class="about-icon">{% icon 'edit' %}</span><span>Configuration</span></h3><div class="body"><p>Start with <a href="{% url 'profile' %}">Candidate Profile</a> and <a href="{% url 'scope' %}">Engagement Preferences</a>, upload active Resumes in Candidate Profile, configure an <a href="{% url 'ai' %}#providers">AI runtime</a>, then choose <a href="{% url 'sources' %}">Search Sources</a>. For Local AI Discovery, configure local Ollama/hardware and source-provider API keys where available, then review <a href="{% url 'sources' %}#source-markets">Discovery Markets</a> and <a href="{% url 'sources' %}#source-custom-domains">Custom Domains</a>. For remote/cloud API discovery, configure <a href="{% url 'ai' %}#providers">OpenAI, Gemini or OpenRouter</a> with an API token and model, then select the Cloud Web routes under <a href="{% url 'ai' %}#discovery">AI &amp; Discovery</a>.</p></div></div>
+    <div class="card about-cell"><h3 class="about-heading"><span class="about-icon">{% icon 'review' %}</span><span>Why use ScoutBox</span></h3><div class="body"><p>Generic search is broad and stateless, while a general chat interface does not by itself preserve the full path from discovery through outreach and application tracking. ScoutBox keeps the same profile, preferences and source policy attached to repeated scans, then preserves provenance, validation, fit signals, notes, contacts, generated material, mailbox activity and outcomes so results remain explainable and reusable instead of being reconstructed from scratch.</p><p>That continuity makes repeated niche searches practical: weak or stale pages can be filtered out, promising employers can be revisited, and each application can be traced back to the evidence and discovery path that produced it.</p><p>It also keeps discovery quality visible over time, so source yield, direct-site checks, AI decisions and application outcomes can be compared without losing the context behind each record.</p></div></div>
+    <div class="card about-cell"><h3 class="about-heading"><span class="about-icon">{% icon 'runtime_cloud' %}</span><span>Discovery Mode</span></h3><div class="body"><p><b>Local AI Discovery</b> uses local Ollama models plus configured direct sources and search engines. It keeps AI processing on your hardware and avoids cloud-token charges, but needs suitable local hardware and its speed/quality depends on the local model and source coverage.</p><p><b>Cloud Web Discovery</b> uses a configured OpenAI, Gemini or OpenRouter API token and provider-native web research. It reduces local hardware requirements and can provide broader web synthesis, but consumes provider quota/cost and sends research context to that provider. Direct-capable sources may still run directly; ScoutBox search-engine source scraping is bypassed in Cloud Web.</p><p class="muted"><b>Current config:</b> {% if portal_settings.discovery_mode == 'cloud_web' %}Cloud AI Discovery{% else %}Local AI Discovery{% endif %}. Change this under <a href="{% url 'ai' %}#discovery">AI &amp; Discovery</a>.</p></div></div>
+  </div>
+  <div class="card full about-architecture">
+    <div class="section-heading"><h3 class="about-heading architecture-heading"><span class="about-icon">{% icon 'architecture' %}</span><span>Overall System Architecture</span></h3></div>
+    <div class="body architecture-unified">
+      <div class="architecture-diagram architecture-unified-diagram" aria-label="ScoutBox system architecture">
+        <svg viewBox="0 0 1180 455" role="img" aria-label="ScoutBox unified system architecture" aria-describedby="architecture-desc" preserveAspectRatio="xMidYMid meet">
+          <desc id="architecture-desc">Browser requests are served by Django and Gunicorn, persisted to PostgreSQL, and background work is scheduled through Celery Beat and Redis to Celery workers. Workers perform Cloud Web or Local GPU discovery through search, AI and page retrieval, then qualification writes Opportunities, Hidden Leads and Address Book records. Applications, mail, media, usage and diagnostics complete the workflow.</desc>
+          <defs><marker id="arch-unified-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" class="arch-arrow"/></marker></defs>
+          <g class="arch-lines" marker-end="url(#arch-unified-arrow)">
+            <path d="M155 80H245"/><path d="M395 80H485"/><path d="M635 80H725"/><path d="M875 80H965"/>
+            <path d="M320 120V205"/><path d="M560 120V205"/><path d="M800 120V205"/><path d="M1040 120V205"/>
+            <path d="M395 245H485"/><path d="M635 245H725"/><path d="M875 245H965"/>
+            <path d="M1040 285V365"/><path d="M965 405H875"/><path d="M725 405H635"/><path d="M485 405H395"/>
+            <path d="M245 405H165"/><path d="M320 285V365"/><path d="M560 285V365"/><path d="M800 285V365"/>
+          </g>
+          <g class="arch-box arch-runtime"><rect x="25" y="40" width="130" height="80" rx="10"/><text x="90" y="72">Browser / UI</text><text x="90" y="94">Review &amp; Control</text></g>
+          <g class="arch-box arch-runtime"><rect x="245" y="40" width="150" height="80" rx="10"/><text x="320" y="66">Django</text><text x="320" y="86">Gunicorn Web/API</text><text class="arch-hint" x="320" y="106">Django {{arch_versions.django|default:'?'}} · Gunicorn {{arch_versions.gunicorn|default:'?'}}</text></g>
+          <g class="arch-box arch-data"><rect x="485" y="40" width="150" height="80" rx="10"/><text x="560" y="66">PostgreSQL</text><text x="560" y="86">Durable State</text><text class="arch-hint" x="560" y="106">PostgreSQL {{arch_versions.postgresql|default:'?'}}</text></g>
+          <g class="arch-box arch-data"><rect x="725" y="40" width="150" height="80" rx="10"/><text x="800" y="66">Redis</text><text x="800" y="86">Broker / Queue</text><text class="arch-hint" x="800" y="106">Redis {{arch_versions.redis|default:'?'}}</text></g>
+          <g class="arch-box arch-runtime"><rect x="965" y="40" width="150" height="80" rx="10"/><text x="1040" y="66">Celery Worker</text><text x="1040" y="86">Background Tasks</text><text class="arch-hint" x="1040" y="106">Celery {{arch_versions.celery|default:'?'}}</text></g>
+
+          <g class="arch-box arch-runtime"><rect x="245" y="205" width="150" height="80" rx="10"/><text x="320" y="231">Celery Beat</text><text x="320" y="251">Campaign Scheduler</text><text class="arch-hint" x="320" y="272">Celery {{arch_versions.celery|default:'?'}}</text></g>
+          <g class="arch-box arch-runtime"><rect x="485" y="205" width="150" height="80" rx="10"/><text x="560" y="235">Discovery</text><text x="560" y="257">Orchestration</text></g>
+          <g class="arch-box arch-external"><rect x="725" y="205" width="150" height="80" rx="10"/><text x="800" y="226">Cloud AI / Ollama</text><text x="800" y="246">Cloud Web / Local GPU</text><text class="arch-hint" x="800" y="265">{{arch_stats.local_ollama_models}} Ollama model{{arch_stats.local_ollama_models|pluralize}} · {{arch_stats.cloud_provider_count}} cloud provider{{arch_stats.cloud_provider_count|pluralize}}</text><text class="arch-hint" x="800" y="278">{% if arch_stats.cloud_provider_names %}{{arch_stats.cloud_provider_names|join:', '}}{% else %}No cloud provider configured{% endif %}</text></g>
+          <g class="arch-box arch-external"><rect x="965" y="205" width="150" height="80" rx="10"/><text x="1040" y="232">Search + HTTP</text><text x="1040" y="254">Providers / Page Fetch</text></g>
+
+          <g class="arch-box"><rect x="965" y="365" width="150" height="80" rx="10"/><text x="1040" y="395">Qualification</text><text x="1040" y="417">Fit / Remote / Age</text></g>
+          <g class="arch-box arch-data"><rect x="725" y="365" width="150" height="80" rx="10"/><text x="800" y="389">ScoutBox Records</text><text x="800" y="408">Opps / Leads / Contacts</text><text class="arch-hint" x="800" y="429">Opps {{arch_stats.opportunities}} · Leads {{arch_stats.leads}} · Contacts {{arch_stats.contacts}}</text></g>
+          <g class="arch-box"><rect x="485" y="365" width="150" height="80" rx="10"/><text x="560" y="389">Applications</text><text x="560" y="408">&amp; Outreach</text><text class="arch-hint" x="560" y="429">{{arch_stats.applications}} entr{{arch_stats.applications|pluralize:"y,ies"}}</text></g>
+          <g class="arch-box arch-external"><rect x="245" y="365" width="150" height="80" rx="10"/><text x="320" y="386">SMTP / IMAP</text><text x="320" y="405">Mail + Digest</text><text class="arch-hint" x="320" y="423">IN {{arch_mail.incoming|default:'Not configured'}}</text><text class="arch-hint" x="320" y="437">OUT {{arch_mail.outgoing|default:'Not configured'}}</text></g>
+          <g class="arch-box arch-data"><rect x="25" y="365" width="140" height="80" rx="10"/><text x="95" y="389">Media / Files</text><text x="95" y="408">Persistent Storage</text><text class="arch-hint" x="95" y="429">{{arch_stats.persistent_storage}} used</text></g>
+        </svg>
+      </div>
+      <div class="architecture-notes-grid">
+        <div class="architecture-notes-column">
+          <div><b>Django + Gunicorn</b><span>Serve the ScoutBox UI and API endpoints. User actions persist state in PostgreSQL and queue long-running work instead of blocking the browser.</span></div>
+          <div><b>Celery Beat + Redis + Workers</b><span>Celery Beat schedules campaigns and recurring maintenance. Redis carries queued jobs to Celery workers that execute discovery, enrichment, mail and diagnostics.</span></div>
+          <div><b>Discovery and AI</b><span>Cloud Web uses configured cloud AI research. Local discovery combines search providers with Ollama on an available macOS or NVIDIA GPU.</span></div>
+          <div><b>Search and page retrieval</b><span>Workers call search engines and retrieve candidate pages, then validate evidence before qualification and enrichment.</span></div>
+        </div>
+        <div class="architecture-notes-column">
+          <div><b>PostgreSQL</b><span>Stores durable Campaigns, Opportunities, Hidden Leads, Address Book contacts, applications, settings and operational history.</span></div>
+          <div><b>Records and follow-through</b><span>Qualified evidence becomes durable records that feed Applications &amp; Outreach, status tracking and notification workflows.</span></div>
+          <div><b>SMTP / IMAP and persistent media</b><span>Mail integrations deliver digests and support application workflows, while persistent storage holds uploaded and generated files.</span></div>
+          <div><b>Usage and diagnostics</b><span>AI requests, provider activity, resource samples and diagnostic data are collected across the web and worker paths for visibility and troubleshooting.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card full about-troubleshooting">
+    <div class="section-heading"><h3 class="about-heading"><span class="about-icon">{% icon 'terminal' %}</span><span>Troubleshooting Tips</span></h3></div>
+    <div class="body troubleshooting-layout">
+      <section class="troubleshooting-section troubleshooting-status-section">
+        <p class="muted">Run these from the ScoutBox directory. Inspection commands are read-only.</p>
+        <div class="troubleshooting-command-grid">
+          <div class="terminal-command"><code>docker compose ps</code><span>Check web, background/discovery workers, scheduler, PostgreSQL and Redis status.</span></div>
+          <div class="terminal-command"><code>docker compose logs --tail=200 web</code><span>Recent Django/Gunicorn web errors and request failures.</span></div>
+          <div class="terminal-command"><code>docker compose logs --tail=200 worker</code><span>Background enrichment, summaries, imports, mailbox and maintenance tasks.</span></div>
+          <div class="terminal-command"><code>docker compose logs --tail=200 discovery_worker</code><span>Campaign discovery, direct/search acquisition, page fetch and Local/Cloud execution.</span></div>
+          <div class="terminal-command"><code>docker compose logs --tail=200 beat</code><span>Scheduled campaign, watchdog and maintenance activity.</span></div>
+          <div class="terminal-command"><code>docker compose logs --tail=200 db</code><span>PostgreSQL startup, connection and query failures.</span></div>
+          <div class="terminal-command"><code>docker compose logs --tail=200 redis</code><span>Celery broker/queue connectivity and Redis failures.</span></div>
+          <div class="terminal-command"><code>docker compose exec web python manage.py check</code><span>Run Django's system/configuration checks.</span></div>
+          <div class="terminal-command"><code>docker compose exec web python manage.py showmigrations portal</code><span>Confirm ScoutBox migrations are present and applied.</span></div>
+          <div class="terminal-command"><code>docker compose exec web celery -A opportunity_portal inspect ping --timeout 3</code><span>Confirm Celery workers respond to control messages.</span></div>
+          <div class="terminal-command"><code>docker compose exec web celery -A opportunity_portal inspect active --timeout 3</code><span>See tasks currently occupying background/discovery worker slots.</span></div>
+          <div class="terminal-command"><code>docker compose exec web celery -A opportunity_portal inspect reserved --timeout 3</code><span>See tasks already reserved by workers but not yet executing.</span></div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <div class="card full about-reference-card troubleshooting-data-section">
+    <div class="section-heading"><h3 class="about-heading"><span class="about-icon">{% icon 'database' %}</span><span>Common data checks</span></h3></div>
+    <div class="body">
+        <div class="troubleshooting-data-grid">
+          <div class="terminal-command"><span>Inspect recent active Opportunity records.</span><code>docker compose exec web \
+  python manage.py shell -c "
+from portal.models import Opportunity
+print(list(
+    Opportunity.objects.filter(user_deleted=False, suppressed=False)
+    .values('id', 'title', 'company', 'status')[:20]
+))
+"</code></div>
+          <div class="terminal-command"><span>Inspect current Hidden Leads.</span><code>docker compose exec web \
+  python manage.py shell -c "
+from portal.models import CompanyLead
+print(list(
+    CompanyLead.objects.filter(user_deleted=False, deleted_at__isnull=True)
+    .values('id', 'company', 'status', 'score')[:20]
+))
+"</code></div>
+          <div class="terminal-command"><span>Inspect Address Book contacts.</span><code>docker compose exec web \
+  python manage.py shell -c "
+from portal.models import Contact
+print(list(
+    Contact.objects.filter(deleted_at__isnull=True)
+    .values('id', 'name', 'company', 'email')[:20]
+))
+"</code></div>
+          <div class="terminal-command"><span>Find queued/running background work that may explain delayed enrichment or imports.</span><code>docker compose exec web \
+  python manage.py shell -c "
+from portal.models import BackgroundJob
+print(list(
+    BackgroundJob.objects.filter(status__in=['queued', 'running'])
+    .values('id', 'kind', 'label', 'status', 'progress', 'created_at')[:50]
+))
+"</code></div>
+          <div class="terminal-command"><span>Inspect active CampaignRuns, stages and heartbeats.</span><code>docker compose exec web \
+  python manage.py shell -c "
+from portal.models import CampaignRun
+print(list(
+    CampaignRun.objects.filter(status__in=['queued', 'running', 'stopping'])
+    .values('id', 'campaign_id', 'status', 'stage', 'progress', 'heartbeat_at')[:50]
+))
+"</code></div>
+          <div class="terminal-command"><span>Inspect recent incomplete/empty AI responses and failures without printing prompts or outputs.</span><code>docker compose exec web \
+  python manage.py shell -c "
+from portal.models import AIRequestLog
+print(list(
+    AIRequestLog.objects.filter(status__in=['empty_response', 'recovered_response', 'malformed_response', 'failed'])
+    .values('id', 'at', 'stage', 'provider', 'model', 'status', 'duration_ms')[:50]
+))
+"</code></div>
+          <div class="terminal-command"><span>Check whether records are absent because they are currently in the Recycle Bin.</span><code>docker compose exec web \
+  python manage.py shell -c "
+from portal.models import Opportunity, CompanyLead
+print({
+    'opportunities_in_recycle_bin': Opportunity.objects.filter(user_deleted=True).count(),
+    'hidden_leads_in_recycle_bin': CompanyLead.objects.filter(user_deleted=True).count(),
+})
+"</code></div>
+        </div>
+        <div class="troubleshooting-credential-notes">
+          <p class="muted">For a queued job that never starts, check <code>worker</code>, <code>discovery_worker</code> and <code>redis</code>. For web-page failures, check <code>web</code>. For missed scheduled runs, check <code>beat</code>. AI provider behavior is also summarized under AI Requests, Resource Usage and Maintenance → Diagnostic Data.</p>
+        </div>
+    </div>
+  </div>
+  <div class="card full about-reference-card troubleshooting-scripts-section">
+    <div class="section-heading"><h3 class="about-heading"><span class="about-icon">{% icon 'folder_detect' %}</span><span>Useful scripts &amp; key files</span></h3></div>
+    <div class="body">
+        <p class="muted">These are the files most often needed when operating, upgrading or recovering a ScoutBox installation. Deployment secrets live in <code>.env</code>; credentials saved through ScoutBox are encrypted in PostgreSQL.</p>
+        <div class="troubleshooting-file-grid">
+          <div class="terminal-command"><code>./restart_scout_box.sh</code><span>Restart an existing installation, keep its Docker volumes and apply pending migrations.</span></div>
+          <div class="terminal-command"><code>./verify_release.sh</code><span>Run release metadata, Python, shell and targeted static regression checks.</span></div>
+          <div class="terminal-command"><code>./initial_setup.sh</code><span>First-time installation only. Do not use it as an upgrade command for an existing deployment.</span></div>
+          <div class="terminal-command"><code>./set_port.sh</code><span>Change the exposed ScoutBox web port using the supported helper.</span></div>
+          <div class="terminal-command"><code>./reset_admin_password.sh</code><span>Recover a local administrator password from the terminal.</span></div>
+          <div class="terminal-command"><code>./print_creds.sh</code><span>Print saved local administrative credentials and decrypted service secrets for recovery. Treat the output as sensitive; never paste it into diagnostics, chat, tickets or logs.</span></div>
+          <div class="terminal-command"><code>./reset_mail_defaults.sh</code><span>Restore ScoutBox mail-folder/default-mail settings when troubleshooting mail configuration.</span></div>
+          <div class="terminal-command"><code>.env</code><span>Deployment secrets and environment-level settings. Preserve this file during upgrades and never commit or share it.</span></div>
+          <div class="terminal-command"><code>.env.example</code><span>Reference for supported environment variables; safe to compare against without exposing saved secret values.</span></div>
+          <div class="terminal-command"><code>docker-compose.yml</code><span>Main service/volume definition for web, workers, PostgreSQL and Redis.</span></div>
+          <div class="terminal-command"><code>media/</code><span>Uploaded/generated persistent files inside the configured ScoutBox persistent-storage volume.</span></div>
+        </div>
+    </div>
+  </div>
+  <div class="card full about-database-info">
+    <div class="section-heading"><h3 class="about-heading"><span class="about-icon">{% icon 'database' %}</span><span>Database Info</span></h3></div>
+    <div class="body database-info-body">
+      <p class="muted database-info-intro">ScoutBox stores durable application state in PostgreSQL through Django. Application tables use the <code>portal_</code> prefix. The map below is intended for learning and read-only troubleshooting; prefer the ScoutBox UI or Django ORM for edits because direct SQL bypasses validation, audit behavior and application workflows.</p>
+
+      <div class="database-schema-grid">
+        <section class="database-schema-panel">
+          <h4>Core workflow tables</h4>
+          <div class="database-table-list">
+            <div><code>portal_opportunity</code><span><b>Opportunity</b> — discovered roles, fit, status, company context, source URLs and freshness data.</span></div>
+            <div><code>portal_companylead</code><span><b>CompanyLead</b> — Hidden Leads, company research, public contact evidence and fit score.</span></div>
+            <div><code>portal_contact</code><span><b>Contact</b> — Address Book people and company contacts, including researched company context.</span></div>
+            <div><code>portal_application</code><span><b>Application</b> — one-to-one application/outreach record linked to an Opportunity.</span></div>
+            <div><code>portal_campaign</code><span><b>Campaign</b> — saved discovery criteria, sources, locations and scheduling inputs.</span></div>
+            <div><code>portal_campaignrun</code><span><b>CampaignRun</b> — individual campaign executions, stage, progress, provider/model and outcome.</span></div>
+            <div><code>portal_backgroundjob</code><span><b>BackgroundJob</b> — queued/running maintenance, enrichment, import and preparation work.</span></div>
+            <div><code>portal_searchsource</code><span><b>SearchSource</b> — configured discovery/search providers and source settings.</span></div>
+            <div><code>portal_documentasset</code><span><b>DocumentAsset</b> — uploaded resumes, cover letters and other reusable source documents.</span></div>
+            <div><code>portal_importcandidate</code><span><b>ImportCandidate</b> — parsed candidates from text, documents or mailbox imports before final persistence.</span></div>
+          </div>
+        </section>
+
+        <section class="database-schema-panel">
+          <h4>Relations, history &amp; diagnostics</h4>
+          <div class="database-table-list">
+            <div><code>portal_opportunity_campaigns</code><span><b>Opportunity ↔ Campaign</b> — Django many-to-many bridge connecting an Opportunity to one or more Campaigns.</span></div>
+            <div><code>portal_companylead_campaigns</code><span><b>Hidden Lead ↔ Campaign</b> — many-to-many bridge preserving Campaign provenance for Hidden Leads.</span></div>
+            <div><code>portal_opportunityevidence</code><span><b>OpportunityEvidence</b> — structured evidence rows attached to an Opportunity.</span></div>
+            <div><code>portal_applicationstatusevent</code><span><b>ApplicationStatusEvent</b> — status-change history for Applications.</span></div>
+            <div><code>portal_preparedapplicationfile</code><span><b>PreparedApplicationFile</b> — generated CV/cover files associated with an Application.</span></div>
+            <div><code>portal_generatedtextversion</code><span><b>GeneratedTextVersion</b> — generated email/application text versions with provider/model provenance.</span></div>
+            <div><code>portal_airequestlog</code><span><b>AIRequestLog</b> — AI request stage, status, provider/model, duration and token metadata.</span></div>
+            <div><code>portal_chatbotmessage</code><span><b>ChatbotMessage</b> — Chatbot conversation history, role, session and source provider/model.</span></div>
+            <div><code>portal_usagemetric</code><span><b>UsageMetric</b> — provider/stage usage events, token counts, requests, pages and errors.</span></div>
+            <div><code>portal_resourcesample</code><span><b>ResourceSample</b> — CPU, RAM, disk and GPU telemetry samples used by Resource Usage.</span></div><div><code>portal_resourcehourly</code><span><b>ResourceHourly</b> — durable hourly CPU, RAM and GPU roll-ups used to preserve long-range Resource Usage history.</span></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <div class="card full about-reference-card database-sql-section">
+    <div class="section-heading"><h3 class="about-heading"><span class="about-icon">{% icon 'terminal' %}</span><span>Terminal &amp; SQL examples</span></h3></div>
+    <div class="body">
+        <div class="database-sql-heading">
+          <div>
+            <p class="muted">Run these from the ScoutBox directory. Examples use the active PostgreSQL user/database from the <code>db</code> container. Read queries are safe for learning; backup before any direct write or restore.</p>
+          </div>
+        </div>
+
+        <div class="database-command-list">
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>Open PostgreSQL</b><span>Start an interactive <code>psql</code> session against ScoutBox's active database.</span></div>
+            <pre><code>docker compose exec db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'</code></pre>
+          </article>
+
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>Explore the schema</b><span>Inside <code>psql</code>, list ScoutBox tables and inspect columns, indexes and relationships on a specific table.</span></div>
+            <pre><code>\dt portal_*
+\d portal_opportunity
+\d portal_opportunity_campaigns</code></pre>
+          </article>
+
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>Recent Opportunities</b><span>A simple read query for the newest active Opportunity records.</span></div>
+            <pre><code>SELECT id, company, title, status, fit_score, country, created_at
+FROM portal_opportunity
+WHERE user_deleted = false AND suppressed = false
+ORDER BY id DESC
+LIMIT 20;</code></pre>
+          </article>
+
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>Join Opportunities to Campaigns</b><span>Follow the many-to-many bridge to see which Campaign produced or retained each Opportunity.</span></div>
+            <pre><code>SELECT o.id, o.company, o.title, c.id AS campaign_id, c.name AS campaign
+FROM portal_opportunity AS o
+LEFT JOIN portal_opportunity_campaigns AS oc ON oc.opportunity_id = o.id
+LEFT JOIN portal_campaign AS c ON c.id = oc.campaign_id
+WHERE o.user_deleted = false
+ORDER BY o.id DESC, c.name
+LIMIT 50;</code></pre>
+          </article>
+
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>Join Hidden Leads to Campaigns</b><span>Use the Hidden Lead bridge table to verify Campaign provenance.</span></div>
+            <pre><code>SELECT l.id, l.company, l.status, l.score, c.id AS campaign_id, c.name AS campaign
+FROM portal_companylead AS l
+LEFT JOIN portal_companylead_campaigns AS lc ON lc.companylead_id = l.id
+LEFT JOIN portal_campaign AS c ON c.id = lc.campaign_id
+WHERE l.user_deleted = false
+ORDER BY l.id DESC, c.name
+LIMIT 50;</code></pre>
+          </article>
+
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>Join Applications to Opportunities</b><span>Applications have a one-to-one relation to Opportunities, so the foreign key lives on <code>portal_application</code>.</span></div>
+            <pre><code>SELECT a.id AS application_id, a.status AS application_status,
+       o.id AS opportunity_id, o.company, o.title, o.status AS opportunity_status
+FROM portal_application AS a
+JOIN portal_opportunity AS o ON o.id = a.opportunity_id
+WHERE a.deleted_at IS NULL
+ORDER BY a.id DESC
+LIMIT 30;</code></pre>
+          </article>
+
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>Campaign execution history</b><span>Join a Campaign to its runs to inspect stage, model and completion state over time.</span></div>
+            <pre><code>SELECT c.name, r.id AS run_id, r.status, r.stage,
+       r.execution_provider, r.execution_model, r.progress, r.created_at, r.finished_at
+FROM portal_campaignrun AS r
+JOIN portal_campaign AS c ON c.id = r.campaign_id
+ORDER BY r.id DESC
+LIMIT 40;</code></pre>
+          </article>
+
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>Opportunity evidence</b><span>Inspect the structured evidence rows supporting an Opportunity without reading raw discovery result payloads.</span></div>
+            <pre><code>SELECT o.id, o.company, o.title, e.kind, e.label, e.confidence, e.observed_at
+FROM portal_opportunity AS o
+JOIN portal_opportunityevidence AS e ON e.opportunity_id = o.id
+WHERE o.id = 123
+ORDER BY e.observed_at DESC;</code></pre>
+          </article>
+
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>AI activity for one Opportunity</b><span><code>AIRequestLog</code> uses a soft relation through <code>subject_type</code>/<code>subject_id</code>, so cast the object id to text when joining.</span></div>
+            <pre><code>SELECT o.id, o.company, o.title, a.stage, a.status,
+       a.provider, a.model, a.duration_ms, a.tokens_in, a.tokens_out, a.at
+FROM portal_opportunity AS o
+LEFT JOIN portal_airequestlog AS a
+  ON a.subject_type = 'opportunity' AND a.subject_id = o.id::text
+WHERE o.id = 123
+ORDER BY a.at DESC;</code></pre>
+          </article>
+
+          <article class="database-command-card">
+            <div class="database-command-copy"><b>Export a full database backup</b><span>Create a PostgreSQL custom-format dump on the host. This includes ScoutBox schema and data.</span></div>
+            <pre><code>docker compose exec -T db sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' &gt; scoutbox-db.dump</code></pre>
+          </article>
+
+          <article class="database-command-card database-command-danger">
+            <div class="database-command-copy"><b>Restore a full database backup</b><span>Stop application/worker services first. This replaces current database contents; make a fresh backup before restoring.</span></div>
+            <pre><code>docker compose stop web worker discovery_worker beat
+cat scoutbox-db.dump | docker compose exec -T db sh -lc 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists'
+./restart_scout_box.sh</code></pre>
+          </article>
+        </div>
+    </div>
+  </div>
+  <div class="card full about-reference-card database-redis-section">
+    <div class="section-heading"><h3 class="about-heading"><span class="about-icon">{% icon 'redis' %}</span><span>Redis usage</span></h3></div>
+    <div class="body">
+        <div class="database-sql-heading">
+          <div>
+            <p class="muted">Redis is ScoutBox's fast in-memory queue and task-result store. Celery Beat and the web process enqueue work; the normal and discovery workers consume it. PostgreSQL remains the durable home for Opportunities, Hidden Leads, Applications and other product records.</p>
+          </div>
+        </div>
+        <div class="redis-learning-grid">
+          <div class="redis-learning-card"><b>What Redis stores here</b><span>Queued Celery message envelopes, task-result metadata and short-lived broker state. It is infrastructure state, not the main ScoutBox business database.</span></div>
+          <div class="redis-learning-card"><b>Why two queues matter</b><span><code>celery</code> carries general background jobs. <code>discovery</code> is isolated so long campaign discovery runs cannot starve ordinary maintenance and UI-triggered work.</span></div>
+          <div class="redis-learning-card"><b>Safe learning rule</b><span>Prefer <code>INFO</code>, <code>SCAN</code>, <code>TYPE</code>, <code>LLEN</code>, <code>LRANGE</code>, <code>GET</code> and <code>HSCAN</code>. Do not use <code>FLUSHALL</code>, <code>FLUSHDB</code>, broad <code>DEL</code> or queue-pop commands on a live ScoutBox instance.</span></div>
+        </div>
+        <div class="database-command-list redis-command-list">
+          <article class="database-command-card"><div class="database-command-copy"><b>Check and ping Redis</b><span>Confirm the container is running, then verify the same Redis server answers requests.</span></div><pre><code>docker compose ps redis
+docker compose exec redis redis-cli PING
+docker compose logs --tail=100 redis</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Understand the current database</b><span>See server version, memory, clients, persistence and how many keys exist in each logical Redis database.</span></div><pre><code>docker compose exec redis redis-cli INFO server
+docker compose exec redis redis-cli INFO clients
+docker compose exec redis redis-cli INFO memory
+docker compose exec redis redis-cli INFO persistence
+docker compose exec redis redis-cli INFO keyspace</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Measure ScoutBox queue depth</b><span>Both Celery broker queues are Redis lists. Growing counts usually mean workers are stopped, saturated or failing before they can consume work.</span></div><pre><code>docker compose exec redis redis-cli LLEN celery
+docker compose exec redis redis-cli LLEN discovery</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Sample queued messages without removing them</b><span><code>LRANGE</code> reads list entries. Celery envelopes are encoded JSON and may include a base64 body; inspecting them is useful for learning which task/queue headers are present.</span></div><pre><code>docker compose exec redis redis-cli LRANGE celery 0 1
+docker compose exec redis redis-cli LRANGE discovery 0 1</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Extract basic Celery envelope data</b><span>Read the first general-queue message through ScoutBox's configured broker URL and print only useful headers/properties without popping the job.</span></div><pre><code>docker compose exec web \
+  python manage.py shell -c "
+from django.conf import settings
+import json
+import redis
+
+r = redis.Redis.from_url(settings.CELERY_BROKER_URL)
+raw = r.lindex('celery', 0)
+message = json.loads(raw) if raw else {}
+print(json.dumps({
+    'headers': message.get('headers', {}),
+    'properties': message.get('properties', {}),
+}, indent=2, default=str))
+"</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Discover keys safely</b><span>Use incremental <code>SCAN</code> instead of <code>KEYS *</code>. Celery result keys commonly begin with <code>celery-task-meta-</code>.</span></div><pre><code>docker compose exec redis sh -lc 'redis-cli --scan | head -n 50'
+docker compose exec redis sh -lc "redis-cli --scan --pattern 'celery-task-meta-*' | head -n 20"</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Inspect a key before reading it</b><span>Determine type, expiry and memory use first. Then use the matching read command: <code>GET</code> for strings, <code>LRANGE</code> for lists, <code>HSCAN</code> for hashes.</span></div><pre><code>docker compose exec redis redis-cli TYPE '&lt;key&gt;'
+docker compose exec redis redis-cli TTL '&lt;key&gt;'
+docker compose exec redis redis-cli MEMORY USAGE '&lt;key&gt;'
+docker compose exec redis redis-cli GET '&lt;string-key&gt;'
+docker compose exec redis redis-cli HSCAN '&lt;hash-key&gt;' 0 COUNT 20</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Read task-result metadata</b><span>If a result key is present, print a bounded sample. Typical Celery result JSON includes task status, result/error metadata and child-task information.</span></div><pre><code>docker compose exec redis sh -lc '
+k=$(redis-cli --scan \
+  --pattern "celery-task-meta-*" | head -n 1)
+[ -n "$k" ] &amp;&amp; \
+  redis-cli GET "$k" | head -c 4000
+'</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Check latency and slow commands</b><span>Use Redis's own counters when ScoutBox jobs appear delayed. These commands do not modify queue contents.</span></div><pre><code>docker compose exec redis redis-cli INFO stats
+docker compose exec redis redis-cli SLOWLOG GET 10</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Test through ScoutBox configuration</b><span>This avoids assuming a host, port or database number and exercises the exact broker URL Django/Celery use.</span></div><pre><code>docker compose exec web \
+  python manage.py shell -c "
+from django.conf import settings
+import redis
+
+r = redis.Redis.from_url(settings.CELERY_BROKER_URL)
+print('PING:', r.ping())
+print('Redis:', r.info('server').get('redis_version'))
+print('Keys:', r.dbsize())
+print('celery:', r.llen('celery'))
+print('discovery:', r.llen('discovery'))
+"</code></pre></article>
+        </div>
+    </div>
+  </div>
+  <div class="card full about-reference-card database-external-stats-section">
+    <div class="section-heading"><h3 class="about-heading"><span class="about-icon">{% icon 'external_statistics' %}</span><span>External Statistics</span></h3></div>
+    <div class="body">
+        <div class="database-sql-heading">
+          <div>
+            <p class="muted">External Statistics is an optional sidecar interface for importing tracking activity from a separate statistics system. ScoutBox sends tracking-link IDs and paths to the service over the internal container network; the service queries its own data source and returns normalized counts and optional event details. If the service is unavailable, ScoutBox continues to operate normally.</p>
+          </div>
+        </div>
+        <div class="redis-learning-grid">
+          <div class="redis-learning-card"><b>Service interface</b><span>Provide <code>GET /health</code>, <code>POST /test</code> and <code>POST /sync</code>. Health reports whether the service is running/configured; test validates its private data source; sync accepts <code>links: [{id, path}]</code> and returns one normalized result per link.</span></div>
+          <div class="redis-learning-card"><b>Normalized result</b><span>Each result should return <code>id</code>, <code>total</code>, <code>human</code>, <code>first</code>, <code>last</code> and optionally <code>events</code>. Event fields may include <code>source_key</code>, <code>viewed_at</code>, <code>ip_address</code>, <code>user_agent</code>, <code>referrer</code> and <code>raw_uri</code>.</span></div>
+          <div class="redis-learning-card"><b>Write your own sidecar</b><span>The container may use any database, API or log source internally; ScoutBox does not need its schema. Keep credentials inside the sidecar or its mounted secret, expose only the HTTP interface on the private Docker network, and translate your source data into the normalized fields above.</span></div>
+        </div>
+        <div class="database-command-list redis-command-list">
+          <article class="database-command-card"><div class="database-command-copy"><b>Connect it to ScoutBox</b><span>The bundled service is reached at <code>http://stats_service:8787</code>. A replacement service can use another internal hostname or port by setting <code>EXTERNAL_STATS_URL</code> for ScoutBox. Enable or test synchronization under Config → External Statistics.</span></div><pre><code>EXTERNAL_STATS_URL=http://stats_service:8787</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Minimal sync request</b><span>ScoutBox posts only generic tracking identifiers and paths. Your service performs the lookup and returns normalized statistics; it does not need access to ScoutBox's PostgreSQL database.</span></div><pre><code>POST /sync
+{
+  "links": [
+    {"id": 42, "path": "/example-tracking-path"}
+  ]
+}</code></pre></article>
+          <article class="database-command-card"><div class="database-command-copy"><b>Minimal sync response</b><span>Detailed events are optional. Counts and timestamps are enough for aggregate synchronization; event rows allow ScoutBox to retain per-request history when your source can provide it.</span></div><pre><code>{
+  "ok": true,
+  "results": [
+    {
+      "id": 42,
+      "total": 12,
+      "human": 9,
+      "first": "2026-09-01T08:30:00Z",
+      "last": "2026-09-20T14:12:00Z",
+      "events": []
+    }
+  ]
+}</code></pre></article>
+        </div>
+    </div>
+  </div>
+
+
+</div>
+{% endblock %}

@@ -1,0 +1,3 @@
+# ScoutBox 0.8.24
+
+This maintenance release focuses on UI consistency and discovery/application workflow reliability. Multi-access search providers now always render an explicit Public Access default; Applications & Outreach uses a compact toolbar and modal import workflow; outreach subjects are contextual rather than generic; Opportunities regains a Status column while removing redundant colour legends; Address Book editing is simplified; stalled Hidden Market scans no longer remain visible forever; and Candidate Profile can generate role-specific campaign templates that replace earlier profile-generated templates. Built-in campaign templates are removed.

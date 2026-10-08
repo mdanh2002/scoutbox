@@ -1,0 +1,30 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+  web:
+    environment:
+      WAIT_FOR_DB: "1"
+      OLLAMA_BASE_URL: http://ollama:11434
+  worker:
+    environment:
+      WAIT_FOR_DB: "1"
+      OLLAMA_BASE_URL: http://ollama:11434
+  discovery_worker:
+    environment:
+      WAIT_FOR_DB: "1"
+      OLLAMA_BASE_URL: http://ollama:11434
+  forum_worker:
+    environment:
+      WAIT_FOR_DB: "1"
+      OLLAMA_BASE_URL: http://ollama:11434
+  beat:
+    environment:
+      WAIT_FOR_DB: "1"
+      OLLAMA_BASE_URL: http://ollama:11434
+volumes:
+  ollama_data:

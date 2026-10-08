@@ -1,0 +1,10 @@
+<nav class="settings-nav" aria-label="Configuration sections" data-system-config-nav>
+  <a data-settings-panel="settings-general" class="{% if system_tab == 'general' %}active{% endif %}" href="{% url 'settings' %}#settings-general">General</a>
+  <a class="{% if system_tab == 'sources' %}active{% endif %}" href="{% url 'sources' %}">Search Sources</a>
+  <a class="{% if system_tab == 'email' %}active{% endif %}" href="{% url 'email_config' %}">Email</a>
+  <a class="{% if system_tab == 'ai' %}active{% endif %}" href="{% url 'ai' %}">AI &amp; Discovery</a>
+  <a data-settings-panel="settings-tracking" class="{% if system_tab == 'external_stats' %}active{% endif %}" href="{% url 'settings' %}#settings-tracking">External Statistics</a>
+  
+  <a data-settings-panel="settings-admins" class="{% if system_tab == 'admins' %}active{% endif %}" href="{% url 'settings' %}#settings-admins">Users</a>
+  <a data-settings-panel="settings-maintenance" class="{% if system_tab == 'maintenance' %}active{% endif %}" href="{% url 'settings' %}#settings-maintenance">Maintenance</a>
+</nav>

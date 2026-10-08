@@ -1,0 +1,56 @@
+{% extends 'portal/base.html' %}{% load portal_extras %}{% block content %}
+<div class="page-actions hidden-lead-actions" id="actions">
+  <button class="btn success detail-save-button detail-action-equal" type="submit" form="hidden-lead-save-form" name="action" value="status">Save Changes</button>
+  {% if not active_draft %}<form method="post" class="inline-form">{% csrf_token %}<button class="btn primary detail-action-equal" name="action" value="draft">Prepare Outreach</button></form>{% endif %}
+  <span class="spacer"></span>
+</div>
+
+<div class="full-stack">
+<div class="card full"><div class="body">
+  <div class="source-discovery-details hidden-lead-source-details">
+    {% if lead.contact_name %}<div class="kv"><b>Contact</b><span>{{lead.contact_name}}</span></div>{% endif %}
+    <div class="kv"><b>Campaign</b><span>{% for c in lead.campaigns.all %}<a href="{% url 'campaign_detail' c.pk %}">{{c.name}}</a>{% if not forloop.last %}, {% endif %}{% empty %}<span class="muted">Direct / manual</span>{% endfor %}</span></div>
+    <div class="kv"><b>Added</b><span>{{lead.created_at|date:'d/m/Y H:i:s'}}</span></div>
+    <div class="kv"><b>Source</b><span>{{display_source|default:'Direct / manual'}}</span></div>
+    {% if source_url %}<div class="kv"><b>Source URL</b><a href="{{source_url}}" target="_blank" rel="noreferrer">{{source_url}}</a></div>{% endif %}
+    {% with location_text=lead|record_locations_display location_icon=lead|record_locations_icon %}<div class="kv"><b>Company location</b><span class="readonly-location-line" title="Source-derived company location; read-only to avoid corrupting multi-region labels">{% if location_text %}<span class="country-flag">{% if location_icon %}{{location_icon}}{% else %}{{location_text|country_flag}}{% endif %}</span>{{location_text}}{% else %}Not set{% endif %}</span></div>{% endwith %}
+    {% if target_url and not source_target_same %}<div class="kv"><b>Target URL</b><a href="{{target_url}}" target="_blank" rel="noreferrer">{{target_url}}</a></div>{% endif %}
+  </div>
+
+  <form method="post" id="hidden-lead-save-form" class="hidden-lead-note-editor">{% csrf_token %}
+    <div class="form-row detail-compact-form-row"><label>Contact email</label><input type="email" name="contact_email" value="{{lead.contact_email}}" placeholder="name@company.com"></div>
+    <div class="form-row detail-compact-form-row"><label>Status</label><select name="status"><option value="review" {% if lead.status == 'review' %}selected{% endif %}>Review</option><option value="pursue" {% if lead.status == 'pursue' %}selected{% endif %}>Pursue</option><option value="rejected" {% if lead.status == 'rejected' %}selected{% endif %}>Rejected</option><option value="closed" {% if lead.status == 'closed' %}selected{% endif %}>Closed</option></select></div>
+    <div class="form-row detail-compact-form-row"><label>Fit</label><select name="fit_level" class="fit-level-select" aria-label="Fit level"><option value="0" {% if lead.score|fit_level == 0 %}selected{% endif %}>0 — No fit</option><option value="1" {% if lead.score|fit_level == 1 %}selected{% endif %}>1 — Poor fit</option><option value="2" {% if lead.score|fit_level == 2 %}selected{% endif %}>2 — Below average</option><option value="3" {% if lead.score|fit_level == 3 %}selected{% endif %}>3 — Consider</option><option value="4" {% if lead.score|fit_level == 4 %}selected{% endif %}>4 — Good fit</option><option value="5" {% if lead.score|fit_level == 5 %}selected{% endif %}>5 — Excellent fit</option></select></div>
+    <div class="form-row stack"><label>Note</label><textarea name="note" placeholder="Private note about this Hidden Lead…">{{lead.note}}</textarea></div>
+    <button class="btn primary detail-save-button" type="submit" name="action" value="status">Save Changes</button>
+  </form>
+</div></div>
+
+<div class="card full" id="lead-summary-card"><div class="section-heading"><h3>Summary</h3><div class="section-actions">{% if not active_summary %}<form method="post">{% csrf_token %}<button class="icon-btn" name="action" value="refresh_summary" title="Refresh with AI">{% icon 'refresh' %}</button></form>{% endif %}</div></div><div class="body">
+  {% with display_summary=lead.summary|usable_hidden_lead_summary display_match=lead.match_summary|usable_hidden_lead_summary %}{% if display_summary %}<div class="rich-text">{{display_summary|rich_content}}</div>{% elif display_match %}<div class="rich-text">{{display_match|rich_content}}</div>{% elif active_summary %}<span class="muted">Generating Hidden Lead summary…</span>{% else %}<span class="muted">No summary is available yet.</span>{% endif %}{% endwith %}
+</div></div>
+
+<div class="card full" id="lead-company-info-card"><div class="section-heading company-info-heading"><div class="heading-title-group"><h3>Company Info</h3></div><div class="section-actions company-info-actions">{% if company_intel.facts %}<span class="company-confidence-meter" title="Confidence {{company_intel.confidence|confidence_label}} · {{company_intel.confidence}}%"><span class="confidence-bar"><span style="width:{{company_intel.confidence}}%"></span></span><span class="muted company-confidence-percent">{{company_intel.confidence}}%</span></span>{% endif %}{% if active_company %}<span class="muted company-refreshing">Refreshing…</span>{% endif %}<form method="post">{% csrf_token %}<button class="icon-btn section-heading-action-pad company-info-refresh-icon" name="action" value="company_research" title="Refresh company research">{% icon 'refresh' %}</button></form></div></div><div class="body">
+  {% if company_intel.facts %}<ul class="facts-list">{% for f in company_intel.facts %}{% if f.value %}<li><b>{{f.label}}:</b> {{f.value}}</li>{% endif %}{% endfor %}</ul>
+    {% if company_intel.errors %}<details class="advanced"><summary>Research notes</summary><pre class="raw-response">{% for e in company_intel.errors %}{{e}}{% if not forloop.last %}\n{% endif %}{% endfor %}</pre></details>{% endif %}
+  {% elif active_company %}<span class="muted">Collecting public company information from configured search sources and AI…</span>{% else %}<span class="muted">Company research has not produced usable public information yet. Use Refresh to try again.</span>{% endif %}
+</div></div>
+
+<div class="card full" id="lead-evidence-card"><div class="section-heading"><h3>Extracted Text</h3><div class="section-actions">{% if not active_translate %}<form method="post">{% csrf_token %}<button class="icon-btn" name="action" value="translate" title="Translate extracted text to English">{% icon 'web' %}</button></form>{% endif %}</div></div><div class="body">
+  {% if lead.evidence %}<div class="rich-text evidence-scroll">{{lead.evidence|rich_content}}</div>{% else %}<span class="muted">No extracted text.</span>{% endif %}
+  {% if lead.evidence_translation %}<div class="translated-block"><h4>English translation</h4><div class="rich-text">{{lead.evidence_translation|rich_content}}</div></div>{% elif active_translate %}<div class="translated-block"><span class="muted">Translation in progress…</span></div>{% endif %}
+</div></div>
+</div>
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+  const jobs=[];
+  {% if active_summary %}jobs.push({{active_summary.pk}});{% endif %}
+  {% if active_company %}jobs.push({{active_company.pk}});{% endif %}
+  {% if active_translate %}jobs.push({{active_translate.pk}});{% endif %}
+  {% if active_draft %}jobs.push({{active_draft.pk}});{% endif %}
+  if(!jobs.length)return;
+  let finished=false;
+  const timer=setInterval(async()=>{try{for(const id of jobs){const r=await fetch('/jobs/'+id+'/status/',{cache:'no-store'});if(!r.ok)continue;const j=await r.json();if(j.finished){finished=true;break}}if(finished){clearInterval(timer);location.reload()}}catch(e){}},1500);
+})();
+</script>{% endblock %}

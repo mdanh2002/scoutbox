@@ -1,0 +1,13 @@
+{% load portal_extras %}
+<label class="history-range-select">Range <select name="period" aria-label="Date range" data-date-range-select>
+  <option value="all" {% if date_period == 'all' %}selected{% endif %}>All</option>
+  <option value="24h" {% if date_period == '24h' %}selected{% endif %}>24h</option>
+  <option value="3d" {% if date_period == '3d' %}selected{% endif %}>3d</option>
+  <option value="7d" {% if date_period == '7d' %}selected{% endif %}>7d</option>
+  <option value="14d" {% if date_period == '14d' %}selected{% endif %}>14d</option>
+  <option value="30d" {% if date_period == '30d' %}selected{% endif %}>30d</option>
+  <option value="custom" {% if date_period == 'custom' %}selected{% endif %}>Custom</option>
+</select></label>
+<label class="history-range-date"><span>From</span><span class="date-input-wrap"><input type="text" name="from" value="{{date_from}}" placeholder="dd/mm/yyyy" aria-label="From date" inputmode="numeric" pattern="(?:0[1-9]|[12][0-9]|3[01])/(?:0[1-9]|1[0-2])/[0-9]{4}" data-date-range-input><button type="button" class="date-picker-btn" data-date-picker title="Choose From date" aria-label="Choose From date">{% icon 'calendar' %}</button></span></label>
+<label class="history-range-date"><span>To</span><span class="date-input-wrap"><input type="text" name="to" value="{{date_to}}" placeholder="dd/mm/yyyy" aria-label="To date" inputmode="numeric" pattern="(?:0[1-9]|[12][0-9]|3[01])/(?:0[1-9]|1[0-2])/[0-9]{4}" data-date-range-input><button type="button" class="date-picker-btn" data-date-picker title="Choose To date" aria-label="Choose To date">{% icon 'calendar' %}</button></span></label>
+<button class="icon-btn history-range-apply{% if date_period != 'all' or date_from or date_to %} active{% endif %}" type="submit" title="Apply date range" aria-label="Apply date range"{% if not date_from or not date_to %} disabled aria-disabled="true"{% endif %}>{% icon 'filter' %}</button>

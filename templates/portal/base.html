@@ -1,0 +1,608 @@
+{% load static portal_extras %}
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ page_title|default:'ScoutBox' }} · {{ PORTAL_SHORT_NAME }}</title><link rel="icon" href="{% static 'portal/scoutbox-mark.svg' %}" type="image/svg+xml"><link rel="stylesheet" href="{% static 'portal/app.css' %}?v={{PORTAL_VERSION}}"></head>
+<body{% if embedded %} class="embedded-page"{% endif %}><div class="app">
+<aside class="sidebar">
+  <div class="brand account-brand">
+    <a class="logo-menu-button" href="https://www.toughdev.com" target="_blank" rel="noreferrer" aria-label="Open ToughDev"><img class="brand-logo" src="{% static 'portal/scoutbox-mark.svg' %}" width="42" height="42" alt="ScoutBox"></a>
+    <div class="brand-copy"><span>{{ PORTAL_SHORT_NAME }} <small class="version-inline">v{{ PORTAL_VERSION }}</small></span></div>
+  </div>
+  <nav class="nav" id="main-nav">
+    {% for group,items in nav_groups %}<section class="nav-group" data-nav-group><div class="nav-sep">{{group}}</div>
+      {% for route,label in items %}
+      <a href="{% url route %}" data-nav-label="{{label|lower}}" class="{% if request.resolver_match.url_name == route or active_nav == route %}active {% endif %}{% if route == 'dashboard' and attention.new_errors or route == 'opportunities' and attention.unread_opportunities or route == 'cold_contact' and attention.unread_hidden_leads or route == 'applications' and attention.unread_applications or route == 'contacts' and attention.unread_contacts or route == 'facebook_pages' and attention.unread_facebook_pages %}has-unread{% endif %}">
+        <span>{{label}}</span>
+        {% if route == 'dashboard' %}<span class="nav-unread-count nav-error-count" data-error-badge title="{{attention.new_errors}} new error{{attention.new_errors|pluralize}}" {% if not attention.new_errors %}hidden{% endif %}>{% if attention.new_errors > 100 %}99+{% else %}{{attention.new_errors}}{% endif %}</span>
+        {% elif route == 'opportunities' %}<span class="nav-unread-count" data-unread-badge="opportunities" data-badge-tooltip="Unread opportunities" title="{{attention.unread_opportunities}} unread opportunit{{attention.unread_opportunities|pluralize:'y,ies'}}" {% if not attention.unread_opportunities %}hidden{% endif %}>{% if attention.unread_opportunities > 100 %}99+{% else %}{{attention.unread_opportunities}}{% endif %}</span>
+        {% elif route == 'cold_contact' %}<span class="nav-unread-count" data-unread-badge="hidden_leads" data-badge-tooltip="Unread Hidden Leads" title="{{attention.unread_hidden_leads}} unread Hidden Lead{{attention.unread_hidden_leads|pluralize}}" {% if not attention.unread_hidden_leads %}hidden{% endif %}>{% if attention.unread_hidden_leads > 100 %}99+{% else %}{{attention.unread_hidden_leads}}{% endif %}</span>
+        {% elif route == 'applications' %}<span class="nav-unread-count" data-unread-badge="applications" data-badge-tooltip="Unread Applications & Outreach" title="{{attention.unread_applications}} unread Applications & Outreach item{{attention.unread_applications|pluralize}}" {% if not attention.unread_applications %}hidden{% endif %}>{% if attention.unread_applications > 100 %}99+{% else %}{{attention.unread_applications}}{% endif %}</span>
+        {% elif route == 'contacts' %}<span class="nav-unread-count" data-unread-badge="contacts" data-badge-tooltip="New Address Book contacts" title="{{attention.unread_contacts}} new Address Book contact{{attention.unread_contacts|pluralize}}" {% if not attention.unread_contacts %}hidden{% endif %}>{% if attention.unread_contacts > 100 %}99+{% else %}{{attention.unread_contacts}}{% endif %}</span>
+        {% elif route == 'facebook_pages' %}<span class="nav-unread-count" data-unread-badge="facebook_pages" data-badge-tooltip="New Facebook Pages" title="{{attention.unread_facebook_pages}} new Facebook Page{{attention.unread_facebook_pages|pluralize}}" {% if not attention.unread_facebook_pages %}hidden{% endif %}>{% if attention.unread_facebook_pages > 100 %}99+{% else %}{{attention.unread_facebook_pages}}{% endif %}</span>
+        {% elif route == 'recycle_bin' and recycle_bin_count %}<span class="nav-unread-count recycle-bin-count" title="{{recycle_bin_count}} item{{recycle_bin_count|pluralize}} in the Recycle Bin">{{recycle_bin_count}}</span>{% endif %}
+      </a>{% endfor %}
+    </section>{% endfor %}
+  </nav>
+</aside>
+<main class="main"><header class="topbar"><div class="topbar-left">
+  {% if breadcrumbs %}<div class="breadcrumbs">{% for b in breadcrumbs %}{% if not forloop.first %}<span class="crumb-sep">›</span>{% endif %}{% if b.route %}<a href="{% url b.route %}">{{b.label}}</a>{% else %}<span>{{b.label}}</span>{% endif %}{% endfor %}</div>{% endif %}
+  <div class="topbar-title-row"><div class="title{% if active_nav == 'dashboard' %} dashboard-title{% endif %}">{{ page_title }}</div><span id="list-loading-spinner" class="list-loading-spinner" hidden aria-label="Loading list" title="Loading…"></span>{% block title_actions %}{% endblock %}</div>
+</div><div class="actions">
+{% block page_actions %}{% endblock %}
+{% if request.user.is_authenticated %}<span class="topbar-clock" id="global-header-clock" aria-label="Current time"></span><button class="scout-chat-launch topbar-chat-launch" id="scout-chat-launch" type="button" aria-label="Open ScoutBox chatbot" aria-expanded="false" onclick="ScoutChat.toggle()"><img src="{% static 'portal/scoutbox-mark.svg' %}" alt=""><span>Ask ScoutBox</span><span class="scout-chat-unread-badge" id="scout-chat-unread-badge" hidden>1</span></button><div class="attention-actions"><div class="attention-action attention-content-action" aria-label="Unread opportunity and hidden-lead items" tabindex="0"><span class="attention-action-icon">{% icon 'source_jobs' %}</span><span class="attention-badge attention-unread" data-unread-badge="total" {% if not attention.unread_total %}hidden{% endif %}>{% if attention.unread_total > 100 %}99+{% else %}{{attention.unread_total}}{% endif %}</span><span class="attention-popover"><div class="attention-count-links"><a href="{% url 'opportunities' %}"><span data-unread-inline="opportunities">{{attention.unread_opportunities}}</span> Opportunities</a><a href="{% url 'cold_contact' %}"><span data-unread-inline="hidden_leads">{{attention.unread_hidden_leads}}</span> Hidden Leads</a></div><div class="attention-recent" data-attention-recent {% if not attention.recent_opportunities and not attention.recent_leads %}hidden{% endif %}>{% if attention.recent_opportunities %}<span class="attention-recent-title">Recent Opportunities</span>{% for n in attention.recent_opportunities %}<a class="attention-recent-item" href="{{n.url}}"><span class="attention-recent-kind attention-recent-icon" title="Opportunity">{% icon 'source_jobs' %}</span><span class="attention-recent-text">{{n.text}}</span><span class="attention-recent-age">{{n.age_text}}</span></a>{% endfor %}{% endif %}{% if attention.recent_leads %}{% if attention.recent_opportunities %}<div class="attention-recent-divider"></div>{% endif %}<span class="attention-recent-title">Recent Leads</span>{% for n in attention.recent_leads %}<a class="attention-recent-item" href="{{n.url}}"><span class="attention-recent-kind attention-recent-icon" title="Hidden Lead">{% icon 'lead_type' %}</span><span class="attention-recent-text">{{n.text}}</span><span class="attention-recent-age">{{n.age_text}}</span></a>{% endfor %}{% endif %}</div></span></div><div class="attention-action attention-status-action" aria-label="ScoutBox status and alerts" tabindex="0"><span class="attention-action-icon {% if attention.activity_state == 'active' %}attention-ok{% elif attention.activity_state == 'scheduled' %}attention-scheduled{% elif attention.activity_state == 'paused' %}attention-paused{% else %}attention-idle{% endif %}">{% icon 'dashboard' %}</span>{% if attention.alert_count %}<span class="attention-badge {% if attention.new_errors %}attention-errors{% else %}attention-warnings{% endif %}" data-alert-badge title="Recent alerts">{% if attention.alert_count > 100 %}99+{% else %}{{attention.alert_count}}{% endif %}</span>{% endif %}<span class="attention-popover">{% if not ai_readiness.ready %}<b class="attention-status-line"><span class="statusdot warn"></span><span class="attention-status-text">{% if ai_readiness.identifying %}Identifying local accelerator…{% else %}AI unavailable — AI actions are paused.{% endif %}</span></b><div class="attention-ai-warning attention-ai-actions"><a href="{% url 'ai' %}#discovery">Configure</a><button type="button" class="link-button" onclick="openModal('ai-readiness-log-modal')">Show Logs</button></div>{% else %}<b class="attention-status-line"><span class="statusdot {% if attention.activity_state == 'active' %}ok{% elif attention.activity_state == 'scheduled' %}warn{% else %}error{% endif %}"></span><span class="attention-status-text">{{attention.status_text}}</span></b>{% if attention.campaign_name %}{% if attention.campaign_id %}<a class="attention-campaign-link attention-campaign-context" href="{% url 'campaign_detail' attention.campaign_id %}">Campaign: {{attention.campaign_name}}{% if attention.campaign_created %} <span>(created on {{attention.campaign_created|date:'d M Y'}})</span>{% endif %}</a>{% else %}<span>Campaign: {{attention.campaign_name}}</span>{% endif %}{% endif %}{% if attention.latest_campaigns %}<div class="attention-campaigns"><span class="attention-recent-title">Latest campaigns</span>{% for c in attention.latest_campaigns %}<a class="attention-campaign-row" href="{% url 'campaign_detail' c.id %}"><span class="attention-campaign-main"><span class="attention-campaign-name">{{c.name}}</span><span class="attention-campaign-meta">{{c.timestamp}}</span></span><span class="attention-campaign-state {{c.state_class}}">{{c.state}}</span></a>{% endfor %}</div>{% endif %}{% endif %}{% if attention.provider_budget_warning %}<span class="attention-budget-warning">{{attention.provider_budget_warning}}</span>{% endif %}<div data-attention-alerts {% if not attention.alert_heading %}hidden{% endif %}>{% if attention.alert_heading %}<b class="attention-error-heading" data-attention-alert-heading>{{attention.alert_heading}}</b><span data-attention-alert-list>{% for n in attention.alert_notifications %}<a class="attention-error-item attention-alert-{{n.kind|lower}}" href="{{n.url}}"><span><b>{{n.kind}}{% if n.kind == 'Error' or n.kind == 'Warning' %} · {{n.label}}{% endif %}:</b> {{n.detail}}</span>{% if n.age_text %}<small class="attention-recent-age">{{n.age_text}}</small>{% endif %}</a>{% endfor %}</span>{% endif %}</div><a class="attention-dashboard-link" href="{% url 'dashboard' %}">Go to Dashboard</a></span></div></div>{% endif %}
+</div><template id="attention-opportunity-icon-template">{% icon 'source_jobs' %}</template><template id="attention-lead-icon-template">{% icon 'lead_type' %}</template></header>
+<section class="content">{% if messages %}<div class="messages">{% for message in messages %}<div class="message {{ message.tags }}">{% if 'safe-html' in message.tags %}{{ message|safe }}{% else %}{{ message }}{% endif %}</div>{% endfor %}</div>{% endif %}{% block content %}{% endblock %}</section>
+</main></div>
+
+<div class="modal" id="ai-readiness-log-modal" hidden onclick="if(event.target===this)closeModal('ai-readiness-log-modal')"><div class="modal-card modal-form ai-readiness-log-card"><div class="modal-head"><b>AI Readiness Logs</b><button type="button" class="icon-btn" onclick="closeModal('ai-readiness-log-modal')" aria-label="Close">{% icon 'close' %}</button></div><div class="modal-body"><p class="muted">These checks determine whether ScoutBox can start AI work.</p><div class="readiness-log-list">{% for state in ai_readiness.states %}<div class="readiness-log-row"><div><b>{{state.provider|title}}</b>{% if state.model %}<span class="muted"> · {{state.model}}</span>{% endif %}</div><div><span class="statusdot {% if state.ready %}ok{% else %}warn{% endif %}"></span>{{state.reason}}</div>{% if state.provider == 'ollama' %}<div class="readiness-log-detail">GPU: {% if state.accelerator.label %}{{state.accelerator.label}}{% elif state.validated_accelerator %}validated by model test{% elif state.auto_probe.ok %}{{state.auto_probe.label|default:'identified by automatic probe'}}{% elif state.identifying %}identifying…{% else %}not detected{% endif %} · Ollama route test: {% if state.validated_route %}passed{% else %}not current{% endif %}{% if state.installed_models %} · Models: {{state.installed_models|join:', '}}{% endif %}</div>{% else %}<div class="readiness-log-detail">Provider test: {% if state.provider_test_ok %}passed{% else %}not passed{% endif %} · Route test: {% if state.validated_route %}passed{% else %}not current{% endif %}</div>{% endif %}</div>{% endfor %}</div><div class="section-actions"><a class="btn" href="{% url 'gpt_log' %}">AI Requests</a><a class="btn primary" href="{% url 'ai' %}#discovery">Open AI &amp; Discovery</a></div></div></div></div>
+
+<div class="modal" id="portal-alert-modal" hidden onclick="if(event.target===this)closeModal('portal-alert-modal')"><div class="modal-card modal-form"><div class="modal-head"><b id="portal-alert-title">ScoutBox</b><button type="button" class="icon-btn" onclick="closeModal('portal-alert-modal')" aria-label="Close">{% icon 'close' %}</button></div><div class="modal-body"><p id="portal-alert-message"></p><div class="section-actions"><button type="button" class="btn primary" onclick="closeModal('portal-alert-modal')">OK</button></div></div></div></div>
+<div class="modal" id="portal-confirm-modal" hidden onclick="if(event.target===this)resolvePortalConfirm(false)"><div class="modal-card modal-form portal-confirm-card" role="dialog" aria-modal="true" aria-labelledby="portal-confirm-title"><div class="modal-head"><b id="portal-confirm-title">Confirm action</b><button type="button" class="icon-btn" onclick="resolvePortalConfirm(false)" aria-label="Close">{% icon 'close' %}</button></div><div class="modal-body"><p id="portal-confirm-message" class="portal-confirm-message"></p><div class="section-actions"><button type="button" class="btn" onclick="resolvePortalConfirm(false)">Cancel</button><button type="button" class="btn danger" id="portal-confirm-accept" onclick="resolvePortalConfirm(true)">Continue</button></div></div></div></div>
+<div class="modal" id="portal-choice-modal" hidden onclick="if(event.target===this)resolvePortalChoice(null)"><div class="modal-card modal-form portal-choice-card" role="dialog" aria-modal="true" aria-labelledby="portal-choice-title"><div class="modal-head"><b id="portal-choice-title">Choose scope</b><button type="button" class="icon-btn" onclick="resolvePortalChoice(null)" aria-label="Close">{% icon 'close' %}</button></div><div class="modal-body"><p id="portal-choice-message" class="portal-confirm-message"></p><div class="section-actions portal-choice-actions"><button type="button" class="btn ghost portal-choice-history-launch" id="portal-choice-history" hidden>View Past Results</button><button type="button" class="btn" onclick="resolvePortalChoice(null)">Cancel</button><button type="button" class="btn" id="portal-choice-secondary" onclick="resolvePortalChoice('secondary')">Local AI Only</button><button type="button" class="btn" id="portal-choice-quaternary" onclick="resolvePortalChoice('quaternary')" hidden>Cloud AI Only</button><button type="button" class="btn" id="portal-choice-tertiary" onclick="resolvePortalChoice('tertiary')" hidden>Current Page</button><button type="button" class="btn primary" id="portal-choice-primary" onclick="resolvePortalChoice('primary')">All Items</button></div></div></div></div>
+
+{% if request.user.is_authenticated %}
+<div class="scout-chat" id="scout-chat">
+  <section class="scout-chat-panel" id="scout-chat-panel" aria-label="ScoutBox chatbot" hidden>
+    <div class="scout-chat-head"><div><b>ScoutBox</b><small>{{chatbot_summary.provider_label}}{% if chatbot_summary.model %} · {{chatbot_summary.model}}{% endif %}{% if chatbot_summary.is_cloud %} · Internet search {% if chatbot_summary.allow_internet_search %}on{% else %}off{% endif %}{% else %} · Internet search unavailable{% endif %}</small></div><div class="scout-chat-head-actions"><button type="button" class="icon-btn scout-chat-export" onclick="ScoutChat.exportDocx()" title="Export chat to Word" aria-label="Export chat to Word">{% icon 'export' %}</button><button type="button" class="icon-btn" onclick="ScoutChat.fullscreen()" title="Toggle full window" aria-label="Toggle full window">{% icon 'open' %}</button><button type="button" class="icon-btn scout-chat-close" onclick="ScoutChat.toggle()" title="Close" aria-label="Close">{% icon 'close' %}</button></div></div>
+    <div class="scout-chat-body" id="scout-chat-body"><div class="scout-chat-message assistant">Ask about your opportunities, applications, campaigns, configuration, or where to change a ScoutBox setting.</div></div>
+    <div class="scout-chat-compose"><textarea id="scout-chat-input" rows="2" maxlength="1600" placeholder="Ask ScoutBox… Enter to send · Shift+Enter for a new line"></textarea>{% if not chatbot_summary.model %}<div class="scout-chat-warning">Chatbot model is not configured. Select a provider and model in AI &amp; Discovery.</div>{% endif %}</div>
+  </section>
+</div>
+{% endif %}
+<script>
+function portalResultNotice(msg,kind='success'){let host=document.querySelector('.content>.messages');if(!host){host=document.createElement('div');host.className='messages';document.querySelector('.content')?.prepend(host)}if(!host)return;const el=document.createElement('div');el.className='message '+kind;el.textContent=String(msg||'');host.replaceChildren(el);setTimeout(()=>{if(el.isConnected)el.remove();if(host&&!host.children.length)host.remove()},5000)}
+function portalAlert(msg,title='ScoutBox'){const m=document.getElementById('portal-alert-modal'),t=document.getElementById('portal-alert-title'),b=document.getElementById('portal-alert-message');if(!m){console.warn(msg);return}if(t)t.textContent=title||'ScoutBox';if(b)b.textContent=String(msg||'');m.hidden=false}
+let portalConfirmResolver=null;
+function resolvePortalConfirm(result){const resolve=portalConfirmResolver;portalConfirmResolver=null;const m=document.getElementById('portal-confirm-modal');if(m)m.hidden=true;if(resolve)resolve(!!result)}
+function portalConfirm(msg,title='Confirm action',confirmLabel='Continue'){const m=document.getElementById('portal-confirm-modal'),t=document.getElementById('portal-confirm-title'),b=document.getElementById('portal-confirm-message'),accept=document.getElementById('portal-confirm-accept');const destructive=/\b(delete|remove|blacklist|discard|erase|reset|purge|revoke)\b/i.test(String(msg||''));if(!m){console.warn(msg);return Promise.resolve(false)}if(portalConfirmResolver){const previous=portalConfirmResolver;portalConfirmResolver=null;previous(false)}if(t)t.textContent=title||'Confirm action';if(b)b.textContent=String(msg||'');if(accept){accept.textContent=confirmLabel||'Continue';accept.classList.toggle('danger',destructive);accept.classList.toggle('primary',!destructive)}m.hidden=false;setTimeout(()=>accept?.focus(),20);return new Promise(resolve=>{portalConfirmResolver=resolve})}
+let portalChoiceResolver=null;
+function resolvePortalChoice(result){const resolve=portalChoiceResolver;portalChoiceResolver=null;const m=document.getElementById('portal-choice-modal');if(m)m.hidden=true;if(resolve)resolve(result)}
+function portalChoice(msg,title='Choose scope',primaryLabel='All Items',secondaryLabel='Local AI Only',tertiaryLabel='',quaternaryLabel='',historyModalId=''){const m=document.getElementById('portal-choice-modal'),t=document.getElementById('portal-choice-title'),b=document.getElementById('portal-choice-message'),primary=document.getElementById('portal-choice-primary'),secondary=document.getElementById('portal-choice-secondary'),tertiary=document.getElementById('portal-choice-tertiary'),quaternary=document.getElementById('portal-choice-quaternary'),history=document.getElementById('portal-choice-history');if(!m){console.warn(msg);return Promise.resolve(null)}if(portalChoiceResolver){const previous=portalChoiceResolver;portalChoiceResolver=null;previous(null)}if(t)t.textContent=title||'Choose scope';if(b)b.textContent=String(msg||'');if(primary)primary.textContent=primaryLabel||'All Items';if(secondary){secondary.textContent=secondaryLabel||'Local AI Only';secondary.hidden=!secondaryLabel}if(tertiary){tertiary.textContent=tertiaryLabel||'Current Page';tertiary.hidden=!tertiaryLabel}if(quaternary){quaternary.textContent=quaternaryLabel||'Cloud AI Only';quaternary.hidden=!quaternaryLabel}if(history){history.hidden=!historyModalId;history.onclick=historyModalId?(()=>{history.blur();const resolve=portalChoiceResolver;portalChoiceResolver=null;m.hidden=true;if(resolve)resolve(null);if(typeof window.openManualFilterHistory==='function')window.openManualFilterHistory(historyModalId,0);else openModal(historyModalId)}):null}m.hidden=false;setTimeout(()=>primary?.focus(),20);return new Promise(resolve=>{portalChoiceResolver=resolve})}
+function confirmFormSubmit(form,msg,title='Confirm action',confirmLabel='Continue'){if(!form)return false;if(form.dataset.portalConfirmed==='1'){delete form.dataset.portalConfirmed;return true}portalConfirm(msg,title,confirmLabel).then(ok=>{if(ok){form.dataset.portalConfirmed='1';form.requestSubmit()}});return false}
+function confirmSubmitter(button,msg,title='Confirm action',confirmLabel='Continue'){const form=button?.form;if(!form)return false;portalConfirm(msg,title,confirmLabel).then(ok=>{if(ok)form.requestSubmit(button)});return false}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){const c=document.getElementById('portal-choice-modal');if(c&&!c.hidden){resolvePortalChoice(null);return}const m=document.getElementById('portal-confirm-modal');if(m&&!m.hidden)resolvePortalConfirm(false)}});
+function currentPageSelectionState(tableSelector,name,selectedIds=[]){const table=document.querySelector(tableSelector),selected=new Set((selectedIds||[]).map(x=>String(x)));if(!table)return {ids:[],allSelected:false,onlyCurrentPage:false};const boxes=[...table.querySelectorAll('tbody input[type=checkbox][name="'+name+'"]')].filter(cb=>!cb.disabled&&!cb.closest('tr')?.hidden),ids=[...new Set(boxes.map(cb=>String(cb.value||'').trim()).filter(Boolean))];const allSelected=ids.length>0&&ids.every(id=>selected.has(id));return {ids,allSelected,onlyCurrentPage:allSelected&&selected.size===ids.length}}
+async function reEvaluationScopeCounts(kind,search=''){const url=new URL('/re-evaluation/scope-counts/'+encodeURIComponent(kind)+'/',window.location.origin);new URLSearchParams(window.location.search).forEach((value,key)=>url.searchParams.set(key,value));if(search)url.searchParams.set('q',search);const r=await fetch(url.toString(),{headers:{'X-Requested-With':'fetch'},cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||'Unable to calculate re-evaluation scope counts.');return {total:Number(d.total||0),local:Number(d.local||0),cloud:Number(d.cloud||0)}}
+function reEvaluationAllOrigin(scopes){const total=Math.max(0,Number(scopes?.total||0)),local=Math.max(0,Number(scopes?.local||0)),cloud=Math.max(0,Number(scopes?.cloud||0));if(total&&local===total&&!cloud)return 'local';if(total&&cloud===total&&!local)return 'cloud';return ''}
+function reEvaluationScopeLabels(scopes,currentPageCount=0){const total=Math.max(0,Number(scopes?.total||0)),local=Math.max(0,Number(scopes?.local||0)),cloud=Math.max(0,Number(scopes?.cloud||0)),page=Math.max(0,Number(currentPageCount||0)),allOrigin=reEvaluationAllOrigin(scopes),pageMatchesAllOrigin=!!(allOrigin&&total&&page===total);return {all:allOrigin==='local'?'All Local AI Items ('+total+')':(allOrigin==='cloud'?'All Cloud AI Items ('+total+')':'All Items ('+total+')'),local:local&&allOrigin!=='local'?'Local AI Only ('+local+')':'',cloud:cloud&&allOrigin!=='cloud'?'Cloud AI Only ('+cloud+')':'',page:page&&!pageMatchesAllOrigin?'Current Page ('+page+')':''}}
+function reEvaluationScopeMessage(items,scopes,currentPageSelected=false,currentPageCount=0){const total=Math.max(0,Number(scopes?.total||0)),local=Math.max(0,Number(scopes?.local||0)),cloud=Math.max(0,Number(scopes?.cloud||0)),page=Math.max(0,Number(currentPageCount||0)),allOrigin=reEvaluationAllOrigin(scopes);if(allOrigin){const origin=allOrigin==='local'?'Local AI':'Cloud AI',comparison=' This is useful when comparing how a different model evaluates the same entries.';if(currentPageSelected&&page===total)return 'All '+total+' '+origin+'-assessed '+items+' matching the current filters are selected. Re-evaluate all of them?'+comparison;if(currentPageSelected)return 'All '+items+' on the current page are selected. Re-evaluate only the current page, or all '+total+' '+origin+'-assessed entries matching the current filters?'+comparison;return 'Re-evaluate all '+total+' '+origin+'-assessed '+items+' matching the current filters?'+comparison}const origins=[];if(local)origins.push('Local AI');if(cloud)origins.push('Cloud AI');let originChoice='';if(origins.length===1)originChoice=', or only entries whose current Fit was assessed by '+origins[0];else if(origins.length===2)originChoice=', or only entries whose current Fit was assessed by Local AI or Cloud AI';const comparison=origins.length?(' The AI-only '+(origins.length===1?'scope is':'scopes are')+' useful when comparing how a different model evaluates the same entries.') : '';if(currentPageSelected)return 'All '+items+' on the current page are selected. Choose whether to re-evaluate only the current page or all entries matching the current filters'+originChoice+'.'+comparison;return 'No '+items+' are selected. Re-evaluate all entries matching the current filters'+originChoice+'?'+comparison}
+function checkAll(container, checked){document.querySelectorAll(container+' input[type=checkbox]').forEach(x=>{if(!x.disabled)x.checked=checked})}
+function requireChecked(form,name,msg){if(!form){portalAlert(msg||'Select at least one item.');return false}const selected=[...form.elements].some(el=>el&&el.name===name&&el.checked&&!el.disabled);if(!selected){portalAlert(msg||'Select at least one item.');return false}return true}
+function confirmSelected(form,name,msg,submitter){if(submitter&&submitter.blur)submitter.blur();if(!requireChecked(form,name,'Select at least one item.'))return false;portalConfirm(msg).then(ok=>{if(ok){if(submitter&&submitter.blur)submitter.blur();if(submitter)form.requestSubmit(submitter);else form.requestSubmit()}});return false}
+function toggleShowDeletedParam(param='show_deleted',hash=''){const u=new URL(window.location.href),sel='[data-show-deleted-param=\"'+param+'\"]',button=document.querySelector(sel),active=button?button.classList.contains('active'):u.searchParams.get(param)==='1';u.searchParams.set(param,active?'0':'1');u.searchParams.delete('page');if(hash)u.hash='#'+String(hash).replace(/^#/,'');window.location.assign(u.pathname+(u.searchParams.toString()?'?'+u.searchParams.toString():'')+u.hash)}
+function toggleShowDeleted(){toggleShowDeletedParam('show_deleted')}
+async function restoreInlineItem(itemType,itemId,label){const human=String(label||'item');if(!await portalConfirm('Restore '+human+' from the Recycle Bin?','Restore item','Restore'))return;const body=new URLSearchParams({action:'restore_row',row_id:String(itemId||''),item_type:String(itemType||'')});try{const r=await fetch(window.location.pathname+window.location.search,{method:'POST',headers:{'X-CSRFToken':ScoutChat.csrf(),'X-Requested-With':'fetch','Content-Type':'application/x-www-form-urlencoded'},body:body.toString()});let d={};try{d=await r.json()}catch(e){}if(!r.ok||d.ok===false)throw new Error(d.error||'Unable to restore item.');window.location.reload()}catch(e){portalAlert(e.message||String(e),'Restore failed')}}
+async function confirmRecycleDelete(form,name,rowSelector,noun='item',actionValue='delete_selected'){try{document.activeElement&&document.activeElement.blur&&document.activeElement.blur()}catch(e){}if(!form)return false;const controls=[...(form.elements||[])];const boxes=controls.filter(x=>x&&x.matches&&x.matches('input[name="'+name+'"]:checked')&&!x.disabled);if(!boxes.length){portalAlert('Select at least one '+noun+'.');return false}let active=[],already=[];boxes.forEach(box=>{const row=box.closest(rowSelector||'tr');if(row?.dataset.deleted==='1')already.push(box);else active.push(box)});const plural=noun.endsWith('s')?noun:(noun+'s');if(!active.length){portalAlert((already.length===1?'The selected '+noun+' is':already.length+' selected '+plural+' are')+' already in the Recycle Bin. There is nothing to delete.');return false}const base='Move '+active.length+' selected '+(active.length===1?noun:plural)+' to the Recycle Bin?';const note=already.length?'\n\n'+already.length+' selected '+(already.length===1?noun:plural)+' '+(already.length===1?'is':'are')+' already in the Recycle Bin and will be ignored.':'';if(!await portalConfirm(base+note,'Move to Recycle Bin','Delete'))return false;already.forEach(x=>x.checked=false);const action=[...(form.elements||[])].find(x=>x&&x.name==='action');if(action)action.value=actionValue||'delete_selected';form.requestSubmit();return false}
+function initMasterChecks(root=document){root.querySelectorAll('.master-check[data-check-name]').forEach(master=>{if(master.dataset.masterReady==='1')return;master.dataset.masterReady='1';master.addEventListener('change',()=>{const table=master.closest('table'),name=master.dataset.checkName;table?.querySelectorAll('tbody input[name="'+name+'"]').forEach(cb=>{if(!cb.disabled&&!cb.closest('tr')?.hidden)cb.checked=master.checked})})})}
+function liveFilter(input, selector){const q=(input.value||'').trim().toLowerCase();document.querySelectorAll(selector).forEach(el=>{const hay=(el.dataset.search||el.textContent||'').toLowerCase();el.hidden=!!q&&!hay.includes(q)})}
+function filterSelect(input, selectId){const sel=document.getElementById(selectId);if(!sel)return;const q=(input.value||'').trim().toLowerCase();[...sel.options].forEach(o=>{o.hidden=!!q&&!o.text.toLowerCase().includes(q)})}
+function tabOpen(group,id,button){document.querySelectorAll('[data-tab-panel="'+group+'"]').forEach(x=>x.hidden=x.id!==id);document.querySelectorAll('[data-tab-button="'+group+'"]').forEach(x=>x.classList.remove('active'));button?.classList.add('active');sessionStorage.setItem('tab:'+group,id)}
+function initTabs(){document.querySelectorAll('[data-tabs]').forEach(box=>{const group=box.dataset.tabs;const buttons=[...box.querySelectorAll('[data-tab-button="'+group+'"]')];if(!buttons.length)return;buttons.forEach(btn=>btn.addEventListener('click',()=>{tabOpen(group,btn.dataset.target,btn);history.replaceState(null,'','#'+btn.dataset.target)}));let id=location.hash?location.hash.slice(1):sessionStorage.getItem('tab:'+group);let btn=buttons.find(b=>b.dataset.target===id);if(!btn&&id){const anchor=document.getElementById(id),panel=anchor?.closest('[data-tab-panel="'+group+'"]');if(panel)btn=buttons.find(b=>b.dataset.target===panel.id)}btn=btn||buttons[0];tabOpen(group,btn.dataset.target,btn);if(id&&document.getElementById(id)&&id!==btn.dataset.target)setTimeout(()=>document.getElementById(id)?.scrollIntoView({block:'start'}),0)})}
+function openModal(id){const x=document.getElementById(id);if(x)x.hidden=false}function closeModal(id){const x=document.getElementById(id);if(x)x.hidden=true}
+function compactMetricNumber(value){let n=Number(value||0);if(!Number.isFinite(n))n=0;const sign=n<0?'-':'';n=Math.abs(n);for(const [div,suffix] of [[1e12,'T'],[1e9,'B'],[1e6,'M']]){if(n>=div){const out=(n/div).toFixed(1).replace(/\.0$/,'');return sign+out+suffix}}const rounded=Math.abs(n-Math.round(n))<1e-9?Math.round(n):Math.round(n*10)/10;return sign+rounded.toLocaleString()}
+function setCompactMetricValue(el,value){if(!el)return;const n=Number(value||0);el.textContent=compactMetricNumber(n);el.title=Number.isFinite(n)?n.toLocaleString():String(value||0)}
+const ScoutChat={
+  history:[],transcript:[],queue:[],processing:false,pendingServer:0,maxOutstanding:5,submissionTimeoutMs:15000,activeController:null,serverLoaded:false,lastServerId:0,lastSeenAssistantId:0,pollTimer:null,
+  storageKey:'scoutbox-chat:{{request.user.pk|default:"anon"}}',stateKey:'scoutbox-chat-state:{{request.user.pk|default:"anon"}}',seenKey:'scoutbox-chat-seen:{{request.user.pk|default:"anon"}}',
+  csrf(){const m=document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);return m?decodeURIComponent(m[1]):''},
+  outstanding(){return this.queue.length+this.pendingServer+(this.processing?1:0)},
+  save(){try{localStorage.setItem(this.storageKey,JSON.stringify(this.transcript.slice(-60)));localStorage.setItem(this.seenKey,String(this.lastSeenAssistantId||0));const p=document.getElementById('scout-chat-panel');localStorage.setItem(this.stateKey,JSON.stringify({open:p?!p.hidden:false}))}catch(e){}},
+  syncOpenState(){const p=document.getElementById('scout-chat-panel'),b=document.getElementById('scout-chat-launch'),open=!!(p&&!p.hidden);if(b){b.classList.toggle('conversation-open',open);b.setAttribute('aria-expanded',open?'true':'false')}this.syncFullscreenScroll()},
+  syncFullscreenScroll(){const p=document.getElementById('scout-chat-panel');document.body.classList.toggle('scout-chat-fullscreen-lock',!!(p&&!p.hidden&&p.classList.contains('fullscreen')))},
+  badge(count){const el=document.getElementById('scout-chat-unread-badge');if(!el)return;const n=Math.max(0,Number(count||0));el.hidden=!n;el.textContent=n>99?'99+':String(n)},
+  atBottom(){const b=document.getElementById('scout-chat-body');return !!b&&(b.scrollHeight-b.scrollTop-b.clientHeight<28)},
+  markSeenIfVisible(){const p=document.getElementById('scout-chat-panel');if(!p||p.hidden||!this.atBottom())return;const latest=Math.max(0,...this.transcript.filter(x=>x.role==='assistant').map(x=>Number(x.serverId||0)));if(latest>this.lastSeenAssistantId){this.lastSeenAssistantId=latest;this.save()}this.badge(0)},
+  load(){try{this.lastSeenAssistantId=parseInt(localStorage.getItem(this.seenKey)||'0',10)||0;const rows=JSON.parse(localStorage.getItem(this.storageKey)||'[]');if(Array.isArray(rows)){this.transcript=rows.slice(-60);this.history=this.transcript.filter(x=>x&&x.role&&x.text&&!x.transportOnly).slice(-12).map(x=>({role:x.role,text:x.text}));this.transcript.forEach(x=>this.add(x.role,x.text,x.links||[],false,x.at||'',x.serverId||0,true,x.source_provider||'',x.source_model||''))}const state=JSON.parse(localStorage.getItem(this.stateKey)||'{}');const p=document.getElementById('scout-chat-panel');if(p){p.classList.remove('fullscreen');if(state.open)p.hidden=false}}catch(e){}this.syncOpenState();this.syncFullscreenScroll();this.updateComposer();const body=document.getElementById('scout-chat-body');body?.addEventListener('scroll',()=>this.markSeenIfVisible(),{passive:true});this.syncServer();this.pollTimer=setInterval(()=>this.syncServer(),8000)},
+  toggle(){const p=document.getElementById('scout-chat-panel');if(!p)return;const closing=!p.hidden;if(closing)p.classList.remove('fullscreen');p.hidden=closing;this.syncOpenState();if(!p.hidden){const body=document.getElementById('scout-chat-body');setTimeout(()=>{if(body)body.scrollTop=body.scrollHeight;this.markSeenIfVisible();document.getElementById('scout-chat-input')?.focus()},20)}this.save()},
+  fullscreen(){const p=document.getElementById('scout-chat-panel');if(!p)return;p.classList.toggle('fullscreen');this.syncFullscreenScroll();this.save()},
+  renderMarkdown(text){
+    const esc=v=>String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const inline=v=>{let z=esc(v),stash=[];const hold=html=>{stash.push(html);return `@@SCOUTLINK${stash.length-1}@@`};z=z.replace(/\[([^\]]+)\]\(((?:https?:\/\/|\/)[^\s)]+)\)/g,(m,label,url)=>hold('<a href="'+url+'" target="_blank" rel="noreferrer">'+label+'</a>'));z=z.replace(/`([^`\n]+)`/g,(m,code)=>hold('<code>'+code+'</code>'));z=z.replace(/(^|[\s(])((?:https?:\/\/)[^\s<>)\]]+)/g,(m,prefix,url)=>prefix+hold('<a href="'+url+'" target="_blank" rel="noreferrer">'+url+'</a>'));z=z.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/__([^_]+)__/g,'<u>$1</u>').replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>');z=z.replace(/@@SCOUTLINK(\d+)@@/g,(m,i)=>stash[Number(i)]||'');return z};
+    const lines=String(text||'').replace(/\r\n?/g,'\n').split('\n'),out=[];let list=false,blank=false,inFence=false,fenceLang='',fence=[];
+    const closeList=()=>{if(list){out.push('</ul>');list=false}};
+    const closeFence=()=>{if(!inFence)return;const cls=fenceLang?' class="language-'+esc(fenceLang)+'"':'';out.push('<pre class="scout-chat-code-block"><code'+cls+'>'+esc(fence.join('\n'))+'</code></pre>');inFence=false;fenceLang='';fence=[]};
+    for(const raw of lines){const fenceMatch=raw.match(/^\s*```\s*([A-Za-z0-9_+.-]*)\s*$/);if(fenceMatch){closeList();blank=false;if(inFence)closeFence();else{inFence=true;fenceLang=fenceMatch[1]||'';fence=[]}continue}if(inFence){fence.push(raw);continue}const line=raw.trimEnd();if(!line.trim()){closeList();if(!blank&&out.length)out.push('<div class="scout-chat-gap"></div>');blank=true;continue}blank=false;const bullet=line.match(/^\s*[-*]\s+(.+)/);if(bullet){if(!list){out.push('<ul>');list=true}out.push('<li>'+inline(bullet[1])+'</li>');continue}closeList();const heading=line.match(/^\s*#{1,6}\s+(.+)/);if(heading){out.push('<div class="scout-chat-heading"><strong>'+inline(heading[1])+'</strong></div>');continue}if(/^\s*---+\s*$/.test(line)){out.push('<div class="scout-chat-separator"></div>');continue}out.push('<div class="scout-chat-line">'+inline(line.trim())+'</div>')}closeList();closeFence();return out.join('')},
+  visibleLinks(links){const generic=new Set(['Open Candidate Profile','Open Opportunities','Open Hidden Leads','Open Applications & Outreach','Open Address Book','Open Diagnostics','Open Configuration Maintenance']);const out=[];if(!Array.isArray(links))return out;for(const l of links){if(!l||!l.url)continue;const label=String(l.label||'').trim();if(generic.has(label))continue;if(out.some(x=>x.url===l.url))continue;out.push({label:label||'Open',url:l.url});if(out.length>=2)break}return out},
+  add(role,text,links,persist=true,at='',serverId=0,scroll=true,sourceProvider='',sourceModel=''){const body=document.getElementById('scout-chat-body');if(!body)return;const wrap=document.createElement('div');wrap.className='scout-chat-message '+role;if(serverId)wrap.dataset.serverId=serverId;const stamp=at||new Date().toISOString();const meta=document.createElement('div');meta.className='scout-chat-time';try{meta.textContent=new Intl.DateTimeFormat(undefined,{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(stamp))}catch(e){meta.textContent=stamp}wrap.appendChild(meta);const t=document.createElement('div');t.className='scout-chat-rendered';t.innerHTML=role==='assistant'?this.renderMarkdown(text):String(text||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));wrap.appendChild(t);if(role==='assistant'&&(sourceProvider||sourceModel)){const source=document.createElement('div');source.className='scout-chat-source';source.textContent=[sourceProvider,sourceModel].filter(Boolean).join(' · ');wrap.appendChild(source)}const displayLinks=this.visibleLinks(links);if(displayLinks.length){const box=document.createElement('div');box.className='scout-chat-links';displayLinks.forEach(l=>{const a=document.createElement('a');a.href=l.url;a.textContent=l.label;a.className='btn small';a.target='_blank';a.rel='noreferrer';box.appendChild(a)});wrap.appendChild(box)}body.appendChild(wrap);if(scroll)body.scrollTop=body.scrollHeight;if(persist){this.transcript.push({role,text,links:displayLinks,at:stamp,serverId:Number(serverId||0),source_provider:sourceProvider||'',source_model:sourceModel||''});this.transcript=this.transcript.slice(-60);this.save()}},
+  async exportDocx(){const button=document.querySelector('.scout-chat-export');if(button&&button.disabled)return;try{if(button)button.disabled=true;const transcript=this.transcript.filter(x=>x&&x.role&&x.text&&!x.transportOnly).slice(-200);const response=await fetch('{% url "chatbot_export" %}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':this.csrf()},body:JSON.stringify({transcript})});if(!response.ok){let detail='';try{detail=(await response.text()).slice(0,300)}catch(e){}throw new Error(detail||('HTTP '+response.status))}const blob=await response.blob();const cd=response.headers.get('Content-Disposition')||'';const match=cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);let filename=match?decodeURIComponent(match[1].replace(/["]/g,'')):'ScoutBox-chat.docx';const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(url);a.remove()},1000)}catch(err){portalAlert('Chat export failed: '+(err&&err.message?err.message:err))}finally{if(button)button.disabled=false}},
+  async syncServer(){try{const r=await fetch('{% url "chatbot_history" %}',{cache:'no-store'});if(!r.ok)return;const d=await r.json(),rows=Array.isArray(d.messages)?d.messages:[];this.pendingServer=Math.max(0,Number(d.pending_count||0));if(!this.serverLoaded&&rows.length){const body=document.getElementById('scout-chat-body');if(body)body.innerHTML='';this.transcript=[];this.history=[];rows.forEach(x=>{this.add(x.role,x.text,x.links||[],false,x.at||'',x.id||0,true,x.source_provider||'',x.source_model||'');this.transcript.push({role:x.role,text:x.text,links:this.visibleLinks(x.links||[]),at:x.at||'',serverId:Number(x.id||0),source_provider:x.source_provider||'',source_model:x.source_model||''})});this.serverLoaded=true}else if(this.serverLoaded){const have=new Set(this.transcript.map(x=>Number(x.serverId||0)).filter(Boolean)),follow=this.atBottom();rows.filter(x=>!have.has(Number(x.id))).forEach(x=>{const unsynced=this.transcript.find(t=>!Number(t.serverId||0)&&t.role===x.role&&t.text===x.text);if(unsynced){unsynced.serverId=Number(x.id||0);unsynced.at=x.at||unsynced.at;unsynced.source_provider=x.source_provider||unsynced.source_provider||'';unsynced.source_model=x.source_model||unsynced.source_model||'';return}this.add(x.role,x.text,x.links||[],false,x.at||'',x.id||0,follow,x.source_provider||'',x.source_model||'');this.transcript.push({role:x.role,text:x.text,links:this.visibleLinks(x.links||[]),at:x.at||'',serverId:Number(x.id||0),source_provider:x.source_provider||'',source_model:x.source_model||''})})}else this.serverLoaded=true;this.transcript=this.transcript.slice(-60);this.history=this.transcript.filter(x=>x.role&&x.text&&!x.transportOnly).slice(-12).map(x=>({role:x.role,text:x.text}));this.lastServerId=Math.max(0,...this.transcript.map(x=>Number(x.serverId||0)));const unseen=this.transcript.filter(x=>x.role==='assistant'&&Number(x.serverId||0)>this.lastSeenAssistantId).length;this.badge(unseen);if(this.pendingServer>0||this.processing||this.queue.length)this.showTyping();else this.hideTyping();this.updateComposer();this.save();this.markSeenIfVisible()}catch(e){if(this.pendingServer>0)this.showTyping()}},
+  showTyping(){const body=document.getElementById('scout-chat-body');if(!body)return;let el=document.getElementById('scout-chat-typing');if(!el){el=document.createElement('div');el.id='scout-chat-typing';el.className='scout-chat-typing';el.innerHTML='<span></span><span></span><span></span><b>Typing…</b>'}body.appendChild(el);el.hidden=false;body.scrollTop=body.scrollHeight},
+  hideTyping(){const el=document.getElementById('scout-chat-typing');if(el)el.hidden=true},
+  updateComposer(){const input=document.getElementById('scout-chat-input');if(!input)return;const full=this.outstanding()>=this.maxOutstanding;input.disabled=false;input.placeholder=full?'Queue is full — your text will stay here until a slot is available':'Ask ScoutBox… Enter to send · Shift+Enter for a new line'},
+  send(){const input=document.getElementById('scout-chat-input');const q=(input?.value||'').trim();if(!q){this.updateComposer();return}if(this.outstanding()>=this.maxOutstanding){this.updateComposer();return}input.value='';this.add('user',q);const item=this.transcript[this.transcript.length-1]||null;this.queue.push({question:q,item});this.updateComposer();this.showTyping();this.pump()},
+  async pump(){if(this.processing||!this.queue.length)return;this.processing=true;const queued=this.queue.shift(),q=queued?.question||String(queued||''),localItem=queued?.item||null;this.updateComposer();this.showTyping();const controller=new AbortController();this.activeController=controller;const timeout=setTimeout(()=>controller.abort(),this.submissionTimeoutMs);try{const r=await fetch('{% url "chatbot_ask" %}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':this.csrf()},signal:controller.signal,body:JSON.stringify({question:q,history:this.history,current_path:window.location.pathname})});let data={};try{data=await r.json()}catch(parseErr){}if(!r.ok)throw new Error(data.error||('HTTP '+r.status));if(localItem&&data.user_message_id)localItem.serverId=Number(data.user_message_id);this.pendingServer=Math.max(this.pendingServer,0)+1;this.history.push({role:'user',text:q});this.history=this.history.slice(-12);this.save()}catch(e){const timedOut=e?.name==='AbortError';const msg=timedOut?'Connection timed out while submitting this question. ScoutBox may still be processing it; this panel will keep checking for a saved answer.':'Connection interrupted while submitting this question. ScoutBox may still be processing it; this panel will keep checking for a saved answer.';this.add('assistant',msg,[],true);const item=this.transcript[this.transcript.length-1];if(item){item.transportOnly=true;this.save()}}finally{clearTimeout(timeout);if(this.activeController===controller)this.activeController=null;this.processing=false;this.updateComposer();this.pump();setTimeout(()=>this.syncServer(),400);if(this.pendingServer>0||this.queue.length)this.showTyping();else this.hideTyping();if(!this.outstanding())document.getElementById('scout-chat-input')?.focus()}}
+};
+function flagFor(name,listId){const list=listId?document.getElementById(listId):null;if(list){const opt=Array.from(list.options||[]).find(o=>(o.value||'').toLowerCase()===String(name||'').toLowerCase());if(opt){const label=(opt.label||opt.textContent||'').trim(),prefix=label.split(/\s+/)[0]||'';if(/[\u{1F1E6}-\u{1F1FF}]/u.test(prefix))return prefix}}const m={'Singapore':'SG','United States':'US','United Kingdom':'GB','Australia':'AU','Canada':'CA','Germany':'DE','France':'FR','Japan':'JP','China':'CN','Taiwan':'TW','South Korea':'KR','India':'IN','Malaysia':'MY','Thailand':'TH','Philippines':'PH','Indonesia':'ID','Vietnam':'VN','Netherlands':'NL','Sweden':'SE','Norway':'NO','Denmark':'DK','Finland':'FI','Switzerland':'CH','Austria':'AT','Belgium':'BE','Spain':'ES','Portugal':'PT','Italy':'IT','Poland':'PL','New Zealand':'NZ','Ireland':'IE','United Arab Emirates':'AE'};const c=m[name];return c?[...c].map(x=>String.fromCodePoint(127397+x.charCodeAt())).join(''):''}
+function initTokenInputs(){
+  document.querySelectorAll('[data-token-input]').forEach(box=>{
+    if(box.dataset.ready)return;box.dataset.ready='1';
+    const name=box.dataset.name,allowNew=box.dataset.allowNew!=='false',listId=box.dataset.optionsId||'',input=box.querySelector('input[type=text],input[type=search]'),searchable=box.dataset.searchableToken==='true'&&Boolean(listId),maxItems=Math.max(0,parseInt(box.dataset.maxItems||'0',10)||0),values=[];
+    let panel=null;
+    const list=()=>listId?document.getElementById(listId):null;
+    function refreshOptions(){if(!panel)return;const q=(input?.value||'').trim().toLowerCase();panel.querySelectorAll('[data-token-option]').forEach(btn=>{const selected=values.some(x=>x.toLowerCase()===btn.dataset.tokenValue.toLowerCase());btn.hidden=selected||Boolean(q&&!(btn.dataset.tokenLabel||'').includes(q))})}
+    function add(v){
+      v=(v||'').trim();if(box.dataset.normalizeLower==='true')v=v.toLowerCase();if(!v||values.some(x=>x.toLowerCase()===v.toLowerCase()))return false;if(maxItems&&values.length>=maxItems){if(input){input.value='';input.placeholder='Maximum '+maxItems+' '+(box.dataset.maxLabel||'items')}return false}
+      if(!allowNew&&listId){const source=list();if(source&&!Array.from(source.options).some(o=>o.value.toLowerCase()===v.toLowerCase()))return false}
+      values.push(v);const tok=document.createElement('span');tok.className='token';const flag=box.dataset.flags==='true'?flagFor(v,listId):'';tok.append(document.createTextNode((flag?flag+' ':'')+v));
+      const b=document.createElement('button');b.type='button';b.textContent='×';b.title='Remove '+v;b.setAttribute('aria-label','Remove '+v);
+      const hidden=document.createElement('input');hidden.type='hidden';hidden.name=name;hidden.value=v;
+      b.onclick=()=>{const i=values.indexOf(v);if(i>=0)values.splice(i,1);tok.remove();hidden.remove();refreshOptions()};tok.appendChild(b);box.insertBefore(tok,input);box.appendChild(hidden);refreshOptions();return true
+    }
+    (box.dataset.existing||'').split('|').filter(Boolean).forEach(add);
+    function commit(){const v=input.value.trim();if(v&&add(v))input.value=''}
+    function positionPanel(){
+      if(!panel||!input)return;
+      const boxRect=box.getBoundingClientRect(),inputRect=input.getBoundingClientRect(),maxWidth=Math.max(180,boxRect.width-8),width=Math.min(300,maxWidth,Math.max(220,inputRect.width));
+      let left=inputRect.left-boxRect.left;left=Math.max(4,Math.min(left,boxRect.width-width-4));
+      panel.style.left=left+'px';panel.style.right='auto';panel.style.width=width+'px'
+    }
+    function open(){if(!panel)return;positionPanel();panel.hidden=false;box.classList.add('token-input-open');input.setAttribute('aria-expanded','true');refreshOptions()}
+    function close(){if(!panel)return;panel.hidden=true;box.classList.remove('token-input-open');input.setAttribute('aria-expanded','false');input.value=''}
+    if(searchable&&input){
+      input.removeAttribute('list');input.autocomplete='off';input.setAttribute('role','combobox');input.setAttribute('aria-expanded','false');
+      panel=document.createElement('div');panel.className='token-options-popover';panel.hidden=true;panel.setAttribute('role','listbox');
+      const options=Array.from(list()?.options||[]).sort((a,b)=>String(a.value||'').localeCompare(String(b.value||'')));
+      options.forEach(opt=>{const btn=document.createElement('button');btn.type='button';btn.className='token-option';btn.dataset.tokenOption='1';btn.dataset.tokenValue=opt.value;btn.dataset.tokenLabel=((opt.label||'')+' '+(opt.value||'')).toLowerCase();btn.setAttribute('role','option');const flag=flagFor(opt.value,listId);const flagNode=document.createElement('span');flagNode.className='token-option-flag';flagNode.textContent=flag;const label=document.createElement('span');label.textContent=opt.value;btn.append(flagNode,label);btn.addEventListener('mousedown',e=>e.preventDefault());btn.addEventListener('click',()=>{add(opt.value);input.value='';input.focus();open()});panel.appendChild(btn)});
+      box.appendChild(panel);input.addEventListener('focus',open);input.addEventListener('click',open);input.addEventListener('input',()=>{open();refreshOptions()});
+      panel.addEventListener('keydown',e=>{const rows=[...panel.querySelectorAll('.token-option:not([hidden])')],i=rows.indexOf(document.activeElement);if(e.key==='ArrowDown'&&i>=0){e.preventDefault();rows[Math.min(rows.length-1,i+1)]?.focus()}else if(e.key==='ArrowUp'){e.preventDefault();if(i<=0)input.focus();else rows[i-1]?.focus()}else if(e.key==='Escape'){e.preventDefault();close();input.focus()}});
+      document.addEventListener('click',e=>{if(!box.contains(e.target))close()});window.addEventListener('resize',()=>{if(panel&&!panel.hidden)positionPanel()})
+    }
+    input?.addEventListener('keydown',e=>{if(e.key==='Escape'&&searchable){close();input.blur()}else if(e.key==='ArrowDown'&&searchable){e.preventDefault();open();panel.querySelector('.token-option:not([hidden])')?.focus()}else if(e.key==='Enter'&&searchable){const first=panel.querySelector('.token-option:not([hidden])');if(first){e.preventDefault();first.click()}}else if((e.key==='Enter'||e.key===','||e.key==='Tab')&&!searchable){if(input.value.trim()){e.preventDefault();commit()}}else if(e.key==='Backspace'&&!input.value&&values.length){const v=values[values.length-1];box.querySelectorAll('.token').forEach(t=>{if(t.textContent.replace('×','').trim().endsWith(v))t.querySelector('button')?.click()})}});
+    if(!searchable){input?.addEventListener('change',commit);input?.addEventListener('blur',()=>{if(input.value.trim())commit()})}
+  })
+}
+function listPageWindow(current,total){
+  const keep=new Set([1,total]);for(let n=Math.max(1,current-2);n<=Math.min(total,current+2);n++)keep.add(n);
+  if(current<=4)for(let n=1;n<=Math.min(total,7);n++)keep.add(n);
+  if(current>=total-3)for(let n=Math.max(1,total-6);n<=total;n++)keep.add(n);
+  const values=[...keep].filter(n=>n>=1&&n<=total).sort((a,b)=>a-b),out=[];let previous=0;
+  values.forEach(n=>{if(previous&&n-previous>1)out.push('…');out.push(n);previous=n});return out;
+}
+function clearServerFitSort(table){
+  const links=[...table.querySelectorAll('.fit-sort-link')];
+  if(!links.some(link=>link.classList.contains('active')))return;
+  links.forEach(link=>{
+    link.classList.remove('active');
+    link.querySelectorAll('.fit-sort-direction').forEach(node=>node.remove());
+    const u=new URL(link.getAttribute('href')||window.location.href,window.location.href);
+    u.searchParams.set('sort','fit_desc');u.searchParams.delete('page');
+    link.setAttribute('href',u.pathname+u.search+u.hash);
+    const score=link.querySelector('.fit-score-badge')?.getAttribute('title')?.split('\n')?.[0]?.replace(/^Fit score:\s*/,'')||'';
+    link.title=(score?'Fit score '+score+' · ':'')+'click to sort highest first';
+  });
+  const scope=table.closest('[data-async-list-results]'),key=scope?.dataset.asyncListResults;
+  const form=key?document.querySelector('form[data-async-list-search="'+CSS.escape(key)+'"]'):null;
+  const hidden=form?.querySelector('input[name="sort"]');if(hidden)hidden.value='';
+  const current=new URL(window.location.href);
+  if(/^fit_(?:asc|desc)$/.test(current.searchParams.get('sort')||'')){current.searchParams.delete('sort');current.searchParams.delete('page');history.replaceState(history.state,'',current.pathname+current.search+current.hash)}
+  if(scope)scope.querySelectorAll('.pager-nav a[href],.export-btn[href]').forEach(a=>{const u=new URL(a.getAttribute('href'),window.location.href);if(/^fit_(?:asc|desc)$/.test(u.searchParams.get('sort')||'')){u.searchParams.delete('sort');a.setAttribute('href',u.pathname+u.search+u.hash)}});
+}
+function manualFilterLiveMessage(data){
+  const base=String(data?.message||data?.status||'Working');
+  const current=data?.result?.current_item;
+  if(data?.finished||!current?.started_at)return base;
+  const started=Date.parse(current.started_at);if(!Number.isFinite(started))return base;
+  const seconds=Math.max(0,Math.floor((Date.now()-started)/1000));
+  const elapsed=seconds<60?seconds+'s':Math.floor(seconds/60)+'m '+String(seconds%60).padStart(2,'0')+'s';
+  return base+' · current AI request '+elapsed;
+}
+
+function manualFilterDisplayCounts(result){
+  const r=result||{},num=k=>Math.max(0,Number(r[k]||0)||0);
+  const recycled=num('recycled')||num('recycle'),failed=num('failed')+num('timed_out');
+  const rawKept=num('kept')+num('review')+num('protected')+num('skipped')+num('converted_to_hidden_lead')+num('converted_to_opportunity');
+  let checked=num('processed')||num('checked')||num('total_processed');
+  let kept=checked?Math.max(rawKept,checked-recycled-failed):rawKept;
+  if(!checked)checked=kept+recycled+failed;
+  return {checked,kept,recycled,failed};
+}
+
+let scoutListBusyCount=0,scoutListBusyWatchdog=0;
+function clearListBusy(){
+  scoutListBusyCount=0;
+  window.clearTimeout(scoutListBusyWatchdog);
+  const spinner=document.getElementById('list-loading-spinner');if(spinner)spinner.hidden=true;
+}
+function anyListStillBusy(){return !!document.querySelector('[data-async-list-results].async-list-loading,[data-async-list-results][aria-busy="true"]')}
+function reconcileListBusySoon(){
+  window.setTimeout(()=>{if(!anyListStillBusy())clearListBusy()},80);
+}
+function setListBusy(on){
+  scoutListBusyCount=Math.max(0,scoutListBusyCount+(on?1:-1));
+  const spinner=document.getElementById('list-loading-spinner');if(spinner)spinner.hidden=scoutListBusyCount===0;
+  window.clearTimeout(scoutListBusyWatchdog);
+  if(scoutListBusyCount>0){
+    scoutListBusyWatchdog=window.setTimeout(()=>{if(!anyListStillBusy())clearListBusy()},2500);
+  }
+}
+function pulseListBusy(fn){setListBusy(true);requestAnimationFrame(()=>{try{fn()}finally{window.setTimeout(()=>{setListBusy(false);reconcileListBusySoon()},40)}})}
+function listNavigationBusy(){setListBusy(true);window.setTimeout(()=>{if(document.visibilityState==='visible')clearListBusy()},2500)}
+window.addEventListener('pageshow',clearListBusy);window.addEventListener('load',reconcileListBusySoon);document.addEventListener('visibilitychange',()=>{if(!document.hidden)reconcileListBusySoon()});
+function exportListTableCsv(tableId,filename){
+  const table=document.getElementById(String(tableId||''));if(!table)return;
+  const filter=document.querySelector('[data-table-filter="'+CSS.escape(table.id)+'"]'),q=String(filter?.value||'').trim().toLowerCase();
+  const valueFilters=[...document.querySelectorAll('[data-table-value-filter="'+CSS.escape(table.id)+'"]')];
+  const rowText=row=>[...row.cells].map(cell=>cell.textContent||'').join(' ').replace(/\s+/g,' ').trim().toLowerCase();
+  const rows=[...table.tBodies].flatMap(b=>[...b.rows]).filter(row=>{if(q&&!rowText(row).includes(q))return false;for(const ctl of valueFilters){const val=String(ctl.value||'').trim().toLowerCase(),key=ctl.dataset.rowKey||'filterValue';if(val&&String(row.dataset[key]||'').trim().toLowerCase()!==val)return false}return true});
+  const cleanCell=cell=>{const clone=cell.cloneNode(true);clone.querySelectorAll('button,.manual-filter-restore-line').forEach(node=>node.remove());return String(clone.textContent||'').replace(/\s+/g,' ').trim()};
+  const quote=value=>'"'+String(value??'').replace(/"/g,'""')+'"';
+  const header=[...(table.tHead?.rows?.[0]?.cells||[])].map(cell=>cleanCell(cell));
+  const lines=[header,...rows.map(row=>[...row.cells].map(cell=>cleanCell(cell)))].map(row=>row.map(quote).join(','));
+  const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=filename||'scoutbox-export.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function initListTables(root=document){
+  const tables=[...new Set([...root.querySelectorAll('table[data-list-table],table[data-sort-table]')])];
+  tables.forEach(table=>{
+    if(table.dataset.listReady==='1')return;table.dataset.listReady='1';
+    let rows=[...table.tBodies].flatMap(b=>[...b.rows]); if(!rows.length&&table.hasAttribute('data-list-table'))rows=[];
+    const paginate=table.hasAttribute('data-list-table'); let page=1;
+    const id=table.id||('tbl-'+Math.random().toString(36).slice(2)); table.id=id;
+    const pageStateKey='scoutbox:list-page:'+window.location.pathname+':'+id;
+    if(paginate){try{page=Math.max(1,parseInt(sessionStorage.getItem(pageStateKey)||'1',10)||1)}catch(e){page=1}}
+    const sizeSel=document.querySelector('[data-page-size="'+id+'"]'); let pageSize=parseInt(sizeSel?.value||table.dataset.pageSize||'25',10)||25;
+    // Preserve each page's existing search-control footprint. ScoutBox must never
+    // invent a search box for a list that did not already have one. Where a search
+    // exists, matching is deliberately limited to rendered cell text below.
+    const filter=document.querySelector('[data-table-filter="'+id+'"]');
+    const valueFilters=[...document.querySelectorAll('[data-table-value-filter="'+id+'"]')];
+    const pager=document.querySelector('[data-pager="'+id+'"]'),infoTarget=document.querySelector('[data-pager-info="'+id+'"]'),navTarget=document.querySelector('[data-pager-nav="'+id+'"]'),countTarget=document.querySelector('[data-pager-count="'+id+'"]'),pageTarget=document.querySelector('[data-pager-page="'+id+'"]');
+    let sortCol=-1,sortAsc=true;
+    function rowVisibleText(row){return [...row.cells].map(cell=>cell.textContent||'').join(' ').replace(/\s+/g,' ').trim().toLowerCase()}
+    function visibleRows(){const q=(filter?.value||'').trim().toLowerCase();return rows.filter(r=>{if(q&&!rowVisibleText(r).includes(q))return false;for(const ctl of valueFilters){const val=String(ctl.value||'').trim().toLowerCase(),key=ctl.dataset.rowKey||'filterValue';if(val&&String(r.dataset[key]||'').trim().toLowerCase()!==val)return false}return true})}
+    function sortValue(cell){const raw=(cell?.dataset.sort!==undefined?cell.dataset.sort:(cell?.textContent||'')).trim();const compact=raw.replace(/,/g,'').replace(/%$/,'');if(/^[-+]?\d+(?:\.\d+)?$/.test(compact))return {kind:'n',value:Number(compact)};return {kind:'s',value:raw.toLocaleLowerCase()}}
+    function compareRows(a,b){const av=sortValue(a.cells[sortCol]),bv=sortValue(b.cells[sortCol]);let n;if(av.kind==='n'&&bv.kind==='n')n=av.value-bv.value;else n=String(av.value).localeCompare(String(bv.value),undefined,{numeric:true,sensitivity:'base'});return n*(sortAsc?1:-1)}
+    function makeNav(target,pages){target.innerHTML='';const go=n=>{const y=window.scrollY;page=Math.max(1,Math.min(pages,n));try{sessionStorage.setItem(pageStateKey,String(page))}catch(e){}render();requestAnimationFrame(()=>window.scrollTo({top:Math.max(0,Math.min(y,document.documentElement.scrollHeight-window.innerHeight)),behavior:'auto'}))};const addButton=(label,targetPage,disabled,title)=>{const b=document.createElement('button');b.type='button';b.className='btn small ghost pager-button';b.textContent=label;b.disabled=disabled;b.title=title||'';b.onclick=()=>go(targetPage);target.appendChild(b)};addButton('<<',1,page<=1,'First page');addButton('<',page-1,page<=1,'Previous page');listPageWindow(page,pages).forEach(v=>{if(v==='…'){const gap=document.createElement('span');gap.className='pager-gap';gap.textContent='…';target.appendChild(gap);return}const b=document.createElement('button');b.type='button';b.className='btn small ghost pager-number'+(v===page?' active':'');b.textContent=String(v);b.disabled=v===page;b.setAttribute('aria-current',v===page?'page':'false');b.onclick=()=>go(v);target.appendChild(b)});addButton('>',page+1,page>=pages,'Next page');addButton('>>',pages,page>=pages,'Last page')}
+    function render(){let found=visibleRows();if(sortCol>=0)found.sort(compareRows);found.forEach(r=>r.parentNode?.appendChild(r));if(paginate){const pages=Math.max(1,Math.ceil(found.length/pageSize));page=Math.min(page,pages);try{sessionStorage.setItem(pageStateKey,String(page))}catch(e){}rows.forEach(r=>r.hidden=true);found.slice((page-1)*pageSize,page*pageSize).forEach(r=>r.hidden=false);const countText=found.length+' item'+(found.length===1?'':'s'),pageText='page '+page+' / '+pages,infoText=table.dataset.countOnly==='1'?countText:(countText+' · '+pageText);if(countTarget)countTarget.textContent=countText;if(pageTarget)pageTarget.textContent=pageText;if(infoTarget)infoTarget.textContent=infoText;if(navTarget)makeNav(navTarget,pages);else if(pager){pager.innerHTML='';const info=document.createElement('span');info.className='muted pager-info';info.textContent=infoText;const nav=document.createElement('span');nav.className='pager-nav';pager.append(info,nav);makeNav(nav,pages)}}else rows.forEach(r=>r.hidden=!found.includes(r))}
+    if(filter)filter.addEventListener('input',()=>{page=1;try{sessionStorage.setItem(pageStateKey,'1')}catch(e){}pulseListBusy(render)});valueFilters.forEach(ctl=>ctl.addEventListener('change',()=>{page=1;try{sessionStorage.setItem(pageStateKey,'1')}catch(e){}pulseListBusy(render)}));if(sizeSel)sizeSel.addEventListener('change',()=>{pageSize=parseInt(sizeSel.value,10)||25;page=1;try{sessionStorage.setItem(pageStateKey,'1')}catch(e){}pulseListBusy(render)});table.addEventListener('scoutbox:list-refresh',()=>{rows=[...table.tBodies].flatMap(b=>[...b.rows]);page=1;try{sessionStorage.setItem(pageStateKey,'1')}catch(e){}pulseListBusy(render)});
+    const head=[...(table.tHead?.rows?.[0]?.cells||[])];head.forEach(th=>{const label=(th.textContent||'').trim().toLowerCase();const impossible=th.hasAttribute('data-nosort')||th.classList.contains('select-col')||th.classList.contains('action-head')||th.classList.contains('action-cell')||th.classList.contains('right')||!!th.querySelector('input[type=checkbox],button')||!label||['action','actions','edit'].includes(label);if(impossible)return;th.classList.add('sortable');th.setAttribute('role','button');th.setAttribute('tabindex','0');const activate=()=>{const col=th.cellIndex;if(sortCol===col)sortAsc=!sortAsc;else{sortCol=col;sortAsc=true}head.forEach(x=>x.removeAttribute('data-sort-direction'));th.dataset.sortDirection=sortAsc?'asc':'desc';clearServerFitSort(table);pulseListBusy(render)};th.addEventListener('click',activate);th.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate()}})});
+    render();
+  })
+}
+const asyncListControllers=new Map();
+function asyncListFormFor(key){return document.querySelector('form[data-async-list-search="'+CSS.escape(String(key||''))+'"]')}
+function asyncListResultsFor(key){return document.querySelector('[data-async-list-results="'+CSS.escape(String(key||''))+'"]')}
+function normalizeAsyncListForm(formOrControl){
+  if(!formOrControl)return null;
+  if(formOrControl.matches&&formOrControl.matches('form[data-async-list-search]'))return formOrControl;
+  const form=formOrControl.closest?formOrControl.closest('form[data-async-list-search]'):null;
+  return form||null;
+}
+function updateMultiSelectToggleLabel(details){const toggle=details?.querySelector?.('.multi-select-toggle-all input'),label=details?.querySelector?.('[data-toggle-all-label]');if(!toggle||!label)return;const boxes=[...details.querySelectorAll('input[type="checkbox"][name]:not([data-provider-all])')];const all=boxes.length>0&&boxes.every(cb=>cb.checked);toggle.checked=all;label.textContent=all?'Deselect all':'Select all'}
+function submitAsyncFilterForm(form){if(!form)return;if(typeof refreshAsyncList==='function')refreshAsyncList(form);else form.requestSubmit()}
+function multiSelectDetails(control){return control?.closest?.('details.multi-select-filter')||null}
+function multiSelectChoiceBoxes(details){return [...(details?.querySelectorAll?.('input[type="checkbox"][name]:not([data-provider-all])')||[])]}
+function multiSelectModeField(details){return details?.querySelector?.('[data-multiselect-mode],input[type="hidden"][name$="_mode"]')||null}
+function normalizeMultiSelectMode(details){const mode=multiSelectModeField(details),boxes=multiSelectChoiceBoxes(details);if(mode){const all=boxes.length>0&&boxes.every(cb=>cb.checked);mode.value=all?'all':'custom'}updateMultiSelectToggleLabel(details)}
+function snapshotMultiSelectFilter(details){if(!details)return;const fields=[...details.querySelectorAll('input[type="checkbox"],input[type="hidden"][name$="_mode"],[data-multiselect-mode]')];details.dataset.multiselectSnapshot=JSON.stringify(fields.map(el=>({checked:!!el.checked,value:String(el.value||'')})));details.dataset.multiselectPending=''}
+function restoreMultiSelectFilter(details){if(!details||!details.dataset.multiselectSnapshot)return;let snapshot=[];try{snapshot=JSON.parse(details.dataset.multiselectSnapshot)||[]}catch(e){snapshot=[]}const fields=[...details.querySelectorAll('input[type="checkbox"],input[type="hidden"][name$="_mode"],[data-multiselect-mode]')];fields.forEach((el,i)=>{const saved=snapshot[i];if(!saved)return;if(el.type==='checkbox')el.checked=!!saved.checked;else el.value=String(saved.value||'')});details.dataset.multiselectPending='';updateMultiSelectToggleLabel(details)}
+function markDeferredMultiSelectCustom(control){const details=multiSelectDetails(control),field=multiSelectModeField(details);if(field)field.value='custom';if(details)details.dataset.multiselectPending='1';updateMultiSelectToggleLabel(details)}
+function toggleDeferredMultiSelectChecks(control){const details=multiSelectDetails(control);if(!details)return;const boxes=multiSelectChoiceBoxes(details),all=boxes.length>0&&boxes.every(cb=>cb.checked),on=!all;boxes.forEach(cb=>{cb.checked=on});const mode=multiSelectModeField(details);if(mode)mode.value=on?'all':'custom';details.dataset.multiselectPending='1';updateMultiSelectToggleLabel(details)}
+function applyMultiSelectFilter(control){const details=multiSelectDetails(control);if(!details)return;normalizeMultiSelectMode(details);details.dataset.multiselectApplying='1';snapshotMultiSelectFilter(details);details.open=false;const form=details.closest('form[data-async-list-search]');if(form){submitAsyncFilterForm(form);return}applyListMultiFilter(control)}
+function markProviderTypeCustom(control){markDeferredMultiSelectCustom(control)}
+function toggleProviderTypeChecks(control){toggleDeferredMultiSelectChecks(control)}
+function markProviderCustom(control){markDeferredMultiSelectCustom(control)}
+function toggleProviderChecks(control){toggleDeferredMultiSelectChecks(control)}
+function filterMultiSelectPanel(input){const q=String(input?.value||'').trim().toLowerCase(),panel=input?.closest?.('.multi-select-filter-panel');if(!panel)return;panel.querySelectorAll('[data-multi-select-option-search]').forEach(label=>{const hide=!!q&&!String(label.dataset.multiSelectOptionSearch||'').toLowerCase().includes(q);label.hidden=hide;label.classList.toggle('is-filter-hidden',hide);if(hide){label.style.setProperty('display','none','important')}else{label.style.removeProperty('display')}})}
+function markListMultiFilterCustom(control){markDeferredMultiSelectCustom(control)}
+function toggleListMultiFilterChecks(control){toggleDeferredMultiSelectChecks(control)}
+function applyListMultiFilter(control){const details=control?.closest?.('details.multi-select-filter');if(!details)return;normalizeMultiSelectMode(details);const form=details.closest('form[data-async-list-search]');if(form){submitAsyncFilterForm(form);return}listNavigationBusy();const url=new URL(window.location.href);url.searchParams.delete('page');const boxes=multiSelectChoiceBoxes(details),names=new Set(boxes.map(cb=>cb.name));names.forEach(name=>url.searchParams.delete(name));const mode=multiSelectModeField(details),modeName=mode?.name||'';if(modeName)url.searchParams.delete(modeName);if((mode?.value||'all')==='custom'){if(modeName)url.searchParams.set(modeName,'custom');boxes.filter(cb=>cb.checked).forEach(cb=>url.searchParams.append(cb.name,cb.value))}else if(modeName){url.searchParams.set(modeName,'all')}window.location.assign(url.pathname+(url.searchParams.toString()?'?'+url.searchParams.toString():'')+url.hash)}
+function resetMultiSelectSearch(details){const search=details?.querySelector?.('.multi-select-filter-search');if(search){search.value='';filterMultiSelectPanel(search)}}
+function initMultiSelectFilters(root=document){
+  root.querySelectorAll('details.multi-select-filter:not([data-multiselect-ready])').forEach(details=>{
+    details.dataset.multiselectReady='1';updateMultiSelectToggleLabel(details);snapshotMultiSelectFilter(details);
+    details.addEventListener('toggle',()=>{
+      if(details.open){
+        document.querySelectorAll('details.multi-select-filter[open]').forEach(other=>{if(other!==details)other.open=false});
+        resetMultiSelectSearch(details);snapshotMultiSelectFilter(details);
+      }else{
+        if(details.dataset.multiselectApplying==='1'){
+          delete details.dataset.multiselectApplying;snapshotMultiSelectFilter(details);
+        }else{
+          restoreMultiSelectFilter(details);
+        }
+        resetMultiSelectSearch(details);
+      }
+      updateMultiSelectToggleLabel(details);
+    });
+    details.addEventListener('change',event=>{if(event.target?.matches?.('input[type="checkbox"]')){details.dataset.multiselectPending='1'}updateMultiSelectToggleLabel(details)});
+  });
+}
+async function compactScoutBoxFilterUrl(url){
+  const target=url instanceof URL?url:new URL(String(url||window.location.href),window.location.href);
+  if(target.origin!==window.location.origin||target.toString().length<=1800||target.pathname==='/filters/state/')return target;
+  const body=new URLSearchParams({path:target.pathname,query:target.searchParams.toString()});
+  const response=await fetch('/filters/state/',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'X-CSRFToken':ScoutChat.csrf(),'X-Requested-With':'fetch','Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:body.toString()});
+  let data={};try{data=await response.json()}catch(e){}
+  if(!response.ok||!data.url)throw new Error(data.error||'Unable to store the large filter selection.');
+  const compact=new URL(data.url,window.location.origin);compact.hash=target.hash;return compact;
+}
+
+function asyncListRequestUrl(form,href=''){
+  form=normalizeAsyncListForm(form);if(!form)return new URL(window.location.href);
+  const hrefValue=(typeof href==='string'||href instanceof String)?String(href):'';
+  const actionAttr=(form.getAttribute&&form.getAttribute('action'))||window.location.href;
+  const url=new URL(hrefValue||actionAttr||window.location.href,window.location.href);
+  if(!hrefValue){url.search='';for(const [name,value] of new FormData(form).entries()){if(name==='export')continue;url.searchParams.append(name,String(value))}form.querySelectorAll('details.multi-select-filter').forEach(details=>{const mode=multiSelectModeField(details),modeName=mode?.name||'',boxes=multiSelectChoiceBoxes(details),names=new Set(boxes.map(cb=>cb.name).filter(Boolean));if(modeName)url.searchParams.delete(modeName);names.forEach(name=>url.searchParams.delete(name));if(modeName)url.searchParams.set(modeName,(mode?.value||'all'));if((mode?.value||'all')==='custom')boxes.filter(cb=>cb.checked).forEach(cb=>url.searchParams.append(cb.name,cb.value))});url.searchParams.delete('page')}
+  url.searchParams.delete('export');return url;
+}
+function syncAsyncListNodes(doc,key){
+  const current=[...document.querySelectorAll('[data-async-list-sync="'+CSS.escape(String(key||''))+'"]')],fresh=[...doc.querySelectorAll('[data-async-list-sync="'+CSS.escape(String(key||''))+'"]')];
+  current.forEach((node,index)=>{const replacement=fresh[index];if(!replacement)return;node.replaceWith(document.importNode(replacement,true))});
+}
+function resetEnhancedAsyncFilter(select){
+  const wrap=select.closest('.searchable-select-wrap,.country-combobox');
+  if(wrap&&wrap.parentNode){wrap.parentNode.insertBefore(select,wrap);wrap.remove()}
+  if(select.classList.contains('searchable-select')){select.classList.remove('searchable-select-native');delete select.dataset.searchableReady}
+  if(select.classList.contains('country-picker')){select.classList.remove('country-native-hidden');delete select.dataset.countryEnhanced}
+}
+function syncAsyncListFilters(doc,key){
+  const currentForm=asyncListFormFor(key),freshForm=doc.querySelector('form[data-async-list-search="'+CSS.escape(String(key||''))+'"]');
+  if(!currentForm||!freshForm)return;
+  freshForm.querySelectorAll('[data-async-filter-block]').forEach((fresh,index)=>{
+    const blocks=[...currentForm.querySelectorAll('[data-async-filter-block]')],current=blocks[index];
+    if(current)current.replaceWith(document.importNode(fresh,true));
+  });
+  freshForm.querySelectorAll('select[data-async-filter][name]').forEach(fresh=>{
+    const name=fresh.getAttribute('name'),current=currentForm.querySelector('select[data-async-filter][name="'+CSS.escape(name)+'"]');
+    if(!current)return;
+    if(current.closest('.searchable-select-wrap,.country-combobox'))resetEnhancedAsyncFilter(current);
+    current.innerHTML=fresh.innerHTML;current.value=fresh.value;
+  });
+  initCountryPickers();initSearchableSelects();
+}
+async function refreshAsyncList(form,href='',options={}){
+  form=normalizeAsyncListForm(form);
+  const key=form?.dataset.asyncListSearch||'';if(!key)return;
+  const target=asyncListResultsFor(key);if(!target)return;
+  let url=asyncListRequestUrl(form,href);
+  try{url=await compactScoutBoxFilterUrl(url)}catch(error){console.error(error);portalAlert(error.message||String(error),'Filter error');return}
+  const previous=asyncListControllers.get(key),silent=!!options.silent;if(previous)previous.abort();
+  const controller=new AbortController();asyncListControllers.set(key,controller);if(!silent){target.classList.add('async-list-loading');target.setAttribute('aria-busy','true');setListBusy(true);}
+  let busyReleased=false;
+  const releaseBusy=()=>{if(busyReleased)return;busyReleased=true;setListBusy(false)};
+  const safetyTimer=window.setTimeout(()=>{try{controller.abort()}catch(e){}releaseBusy()},30000);
+  try{
+    const response=await fetch(url.toString(),{credentials:'same-origin',cache:'no-store',headers:{'X-Requested-With':'fetch'},signal:controller.signal});
+    if(!response.ok)throw new Error('List search failed (HTTP '+response.status+').');
+    const doc=new DOMParser().parseFromString(await response.text(),'text/html'),incoming=doc.querySelector('[data-async-list-results="'+key+'"]');
+    if(!incoming)throw new Error('List search returned an unexpected response.');
+    if(asyncListControllers.get(key)!==controller)return;
+    target.innerHTML=incoming.innerHTML;syncAsyncListNodes(doc,key);syncAsyncListFilters(doc,key);initMultiSelectFilters(document);initListTables(target);initMasterChecks(target);initAsyncListSearches(target);
+    document.dispatchEvent(new CustomEvent('scoutbox:list-updated',{detail:{key,target,url:url.toString()}}));
+    history.replaceState(null,'',url.pathname+url.search+(window.location.hash||''));
+  }catch(error){if(error?.name!=='AbortError'&&asyncListControllers.get(key)===controller){console.error(error);if(!/\[object\s+HTML/i.test(url.pathname+url.search))window.location.assign(url.toString())}}
+  finally{window.clearTimeout(safetyTimer);if(asyncListControllers.get(key)===controller){asyncListControllers.delete(key);target.classList.remove('async-list-loading');target.removeAttribute('aria-busy')}releaseBusy();reconcileListBusySoon()}
+}
+function initCompanyThresholdFilters(modal){return}
+const companyFilterDefaultPrompt='Select filters, then click Apply.';
+function setCompanyFilterPrompt(modal,text){const el=modal?.querySelector?.('[data-company-filter-prompt]');if(el)el.textContent=text||companyFilterDefaultPrompt}
+function openCompanySizeFilter(id){const modal=document.getElementById(id);if(!modal)return;setCompanyFilterPrompt(modal,companyFilterDefaultPrompt);openModal(id)}
+function resetCompanySizeFilter(id){const modal=document.getElementById(id);if(!modal)return;modal.querySelectorAll('[data-company-size-choice],[data-company-age-choice],[data-contact-method-choice]').forEach(cb=>cb.checked=true);setCompanyFilterPrompt(modal,'Review selections, then click Apply.')}
+function applyCompanyBestFitFilter(id){const modal=document.getElementById(id);if(!modal)return;const sizeAllowed=new Set(['lt10','lt50','lt100','unknown']),ageAllowed=new Set(['lt1','lt2','lt5','unknown']),methodAllowed=new Set(['web','email','forum','unknown']);modal.querySelectorAll('[data-company-size-choice]').forEach(cb=>{cb.checked=sizeAllowed.has(cb.value)});modal.querySelectorAll('[data-company-age-choice]').forEach(cb=>{cb.checked=ageAllowed.has(cb.value)});modal.querySelectorAll('[data-contact-method-choice]').forEach(cb=>{cb.checked=methodAllowed.has(cb.value)});setCompanyFilterPrompt(modal,'Review selections, then click Apply.')}
+function applyCompanySizeFilter(id){const modal=document.getElementById(id);if(!modal)return;const sizeBoxes=[...modal.querySelectorAll('[data-company-size-choice]')],ageBoxes=[...modal.querySelectorAll('[data-company-age-choice]')],methodBoxes=[...modal.querySelectorAll('[data-contact-method-choice]')],checkedSize=sizeBoxes.filter(cb=>cb.checked),checkedAge=ageBoxes.filter(cb=>cb.checked),checkedMethod=methodBoxes.filter(cb=>cb.checked);if(sizeBoxes.length&&!checkedSize.length){setCompanyFilterPrompt(modal,'Select at least one company-size band.');portalAlert('Select at least one company-size band.','Company Filter');return}if(ageBoxes.length&&!checkedAge.length){setCompanyFilterPrompt(modal,'Select at least one company/domain age band.');portalAlert('Select at least one company/domain age band.','Company Filter');return}if(methodBoxes.length&&!checkedMethod.length){setCompanyFilterPrompt(modal,'Select at least one contact method.');portalAlert('Select at least one contact method.','Company Filter');return}const url=new URL(window.location.href);['company_size','company_age','contact_method','company_filter_reset','page'].forEach(k=>url.searchParams.delete(k));let narrowed=false;if(checkedSize.length<sizeBoxes.length){narrowed=true;checkedSize.forEach(cb=>url.searchParams.append('company_size',cb.value))}if(ageBoxes.length&&checkedAge.length<ageBoxes.length){narrowed=true;checkedAge.forEach(cb=>url.searchParams.append('company_age',cb.value))}if(methodBoxes.length&&checkedMethod.length<methodBoxes.length){narrowed=true;checkedMethod.forEach(cb=>url.searchParams.append('contact_method',cb.value))}if(!narrowed)url.searchParams.set('company_filter_reset','1');window.location.assign(url.pathname+(url.searchParams.toString()?'?'+url.searchParams.toString():'')+url.hash)}
+function toggleAsyncFailedUrls(key,checked){const form=asyncListFormFor(key);if(!form)return;let field=form.querySelector('input[name="healthy"]');if(!field){field=document.createElement('input');field.type='hidden';field.name='healthy';form.appendChild(field)}field.value=checked?'1':'';refreshAsyncList(form)}
+function navigateListFacet(name,value){listNavigationBusy();const u=new URL(window.location.href);if(value)u.searchParams.set(name,value);else u.searchParams.delete(name);u.searchParams.delete('page');window.location.href=u.toString()}
+function toggleServerFailedUrls(checked){navigateListFacet('healthy',checked?'1':'')}
+// Prevent every ScoutBox list/filter screen from constructing a request line that
+// can exceed the web server limit. Async lists compact before fetching; ordinary GET
+// forms and export/sort links are compacted here before navigation.
+document.addEventListener('click',async event=>{
+  const link=event.target?.closest?.('a[href]');if(!link||event.defaultPrevented||link.hasAttribute('download'))return;
+  let url;try{url=new URL(link.href,window.location.href)}catch(e){return}
+  if(url.origin!==window.location.origin||url.toString().length<=1800)return;
+  event.preventDefault();event.stopImmediatePropagation();listNavigationBusy();
+  try{const compact=await compactScoutBoxFilterUrl(url);window.location.assign(compact.toString())}
+  catch(error){setListBusy(false);portalAlert(error.message||String(error),'Filter error')}
+},true);
+document.addEventListener('submit',async event=>{
+  const form=event.target;if(!(form instanceof HTMLFormElement)||form.matches('[data-async-list-search]')||String(form.method||'get').toLowerCase()!=='get')return;
+  const action=new URL(form.action||window.location.href,window.location.href);action.search='';for(const [name,value] of new FormData(form).entries())action.searchParams.append(name,String(value));
+  if(action.toString().length<=1800)return;
+  event.preventDefault();event.stopImmediatePropagation();listNavigationBusy();
+  try{const compact=await compactScoutBoxFilterUrl(action);window.location.assign(compact.toString())}
+  catch(error){setListBusy(false);portalAlert(error.message||String(error),'Filter error')}
+},true);
+
+function initAsyncListSearches(root=document){
+  root.querySelectorAll('form[data-async-list-search]').forEach(form=>{
+    if(form.dataset.asyncListReady==='1')return;form.dataset.asyncListReady='1';const key=form.dataset.asyncListSearch,input=form.querySelector('input[name="q"]');let timer=0;
+    const queue=()=>{window.clearTimeout(timer);timer=window.setTimeout(()=>refreshAsyncList(form),260)};
+    input?.addEventListener('input',queue);form.addEventListener('submit',event=>{event.preventDefault();window.clearTimeout(timer);refreshAsyncList(form)});
+    form.addEventListener('change',event=>{if(event.target?.closest?.('details.multi-select-filter'))return;if(event.target&&event.target.matches('[data-async-filter]')){window.clearTimeout(timer);refreshAsyncList(form)}});
+    const target=asyncListResultsFor(key);if(target&&target.dataset.asyncPagerReady!=='1'){target.dataset.asyncPagerReady='1';target.addEventListener('click',event=>{const link=event.target.closest('a[href]');if(!link||!target.contains(link)||link.matches('.export-btn,[download]'))return;const isAsyncLink=link.matches('[data-async-list-link]')||!!link.closest('.server-pager .pager-nav');if(!isAsyncLink)return;event.preventDefault();refreshAsyncList(form,link.href)})}
+    const refreshMs=parseInt(form.dataset.asyncListRefreshMs||'0',10)||0;if(refreshMs>=1000&&form.dataset.asyncAutoRefreshReady!=='1'){form.dataset.asyncAutoRefreshReady='1';window.setInterval(()=>{if(document.hidden||asyncListControllers.has(key))return;const active=document.activeElement;if(active&&form.contains(active)&&['INPUT','SELECT','TEXTAREA'].includes(active.tagName))return;refreshAsyncList(form,window.location.href,{silent:true})},refreshMs)}
+  });
+  root.querySelectorAll('[data-async-page-size-for]').forEach(control=>{
+    if(control.dataset.asyncSizeReady==='1')return;control.dataset.asyncSizeReady='1';control.addEventListener('change',()=>{const form=asyncListFormFor(control.dataset.asyncPageSizeFor);if(!form)return;let field=form.querySelector('input[name="per_page"]');if(!field){field=document.createElement('input');field.type='hidden';field.name='per_page';form.appendChild(field)}field.value=control.value;refreshAsyncList(form)})
+  });
+}
+function updateGlobalHeaderClock(){const el=document.getElementById('global-header-clock');if(!el)return;const d=new Date(),p=n=>String(n).padStart(2,'0');el.textContent=p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())}
+function renderAttentionRecent(data){const box=document.querySelector('[data-attention-recent]');if(!box)return;const opportunities=Array.isArray(data.recent_opportunities)?data.recent_opportunities:[],leads=Array.isArray(data.recent_leads)?data.recent_leads:[];box.innerHTML='';box.hidden=!opportunities.length&&!leads.length;const iconHtml=kind=>document.getElementById(kind==='lead'?'attention-lead-icon-template':'attention-opportunity-icon-template')?.innerHTML||'';const section=(title,rows,kind)=>{if(!rows.length)return;const heading=document.createElement('span');heading.className='attention-recent-title';heading.textContent=title;box.appendChild(heading);rows.forEach(n=>{const a=document.createElement('a');a.className='attention-recent-item';a.href=n.url||'#';const icon=document.createElement('span');icon.className='attention-recent-kind attention-recent-icon';icon.title=kind==='lead'?'Hidden Lead':'Opportunity';icon.innerHTML=iconHtml(kind);const text=document.createElement('span');text.className='attention-recent-text';text.textContent=n.text||'';const age=document.createElement('span');age.className='attention-recent-age';age.textContent=n.age_text||'';a.append(icon,text,age);box.appendChild(a)})};section('Recent Opportunities',opportunities,'opportunity');if(opportunities.length&&leads.length){const divider=document.createElement('div');divider.className='attention-recent-divider';box.appendChild(divider)}section('Recent Leads',leads,'lead')}
+function renderAttentionAlerts(data){const box=document.querySelector('[data-attention-alerts]'),rows=Array.isArray(data.alert_notifications)?data.alert_notifications:[];if(!box)return;box.innerHTML='';box.hidden=!rows.length;if(!rows.length)return;const heading=document.createElement('b');heading.className='attention-error-heading';heading.textContent=data.alert_heading||('Last '+rows.length+' alert'+(rows.length===1?'':'s'));box.appendChild(heading);rows.forEach(n=>{const a=document.createElement('a');a.className='attention-error-item attention-alert-'+String(n.kind||'alert').toLowerCase();a.href=n.url||'#';const main=document.createElement('span'),strong=document.createElement('b');strong.textContent=String(n.kind||'Alert')+((n.kind==='Error'||n.kind==='Warning')&&n.label?' · '+n.label:'')+':';main.append(strong,document.createTextNode(' '+String(n.detail||'')));a.appendChild(main);if(n.age_text){const age=document.createElement('small');age.className='attention-recent-age';age.textContent=n.age_text;a.appendChild(age)}box.appendChild(a)})}
+function scoutboxActiveAutoRefreshListKey(){
+  if(document.querySelector('form[data-async-list-search="opportunities"]'))return 'opportunities';
+  if(document.querySelector('form[data-async-list-search="hidden-leads"]'))return 'hidden_leads';
+  if(document.getElementById('contacts-table'))return 'contacts';
+  return '';
+}
+function scoutboxListRefreshIsSafe(){
+  if(document.hidden)return false;
+  if(document.querySelector('.modal:not([hidden])'))return false;
+  if(document.querySelector('input[name="opportunity_ids"]:checked,input[name="lead_ids"]:checked,input[name="contact_ids"]:checked'))return false;
+  const active=document.activeElement;
+  if(active&&active!==document.body){
+    const tag=(active.tagName||'').toUpperCase();
+    if(['INPUT','SELECT','TEXTAREA','BUTTON'].includes(tag)||active.isContentEditable)return false;
+  }
+  return true;
+}
+function scoutboxRefreshVisibleListForNewItems(key){
+  if(window.__scoutboxListRefreshPending||!scoutboxListRefreshIsSafe())return;
+  window.__scoutboxListRefreshPending=true;
+  window.setTimeout(()=>{
+    try{
+      if(!scoutboxListRefreshIsSafe()){window.__scoutboxListRefreshPending=false;return}
+      if(key==='opportunities'){
+        const form=document.querySelector('form[data-async-list-search="opportunities"]');
+        if(form){refreshAsyncList(form,window.location.href,{silent:true}).finally?.(()=>{window.__scoutboxListRefreshPending=false});return}
+      }else if(key==='hidden_leads'){
+        const form=document.querySelector('form[data-async-list-search="hidden-leads"]');
+        if(form){refreshAsyncList(form,window.location.href,{silent:true}).finally?.(()=>{window.__scoutboxListRefreshPending=false});return}
+      }else if(key==='contacts'){
+        window.location.reload();return;
+      }
+    }catch(e){console.error(e)}
+    window.__scoutboxListRefreshPending=false;
+  },350);
+}
+function scoutboxMaybeRefreshVisibleListAfterBadgeUpdate(d){
+  const key=scoutboxActiveAutoRefreshListKey();if(!key)return;
+  const counts={opportunities:Number(d.opportunities||0),hidden_leads:Number(d.hidden_leads||0),contacts:Number(d.contacts||0)};
+  window.__scoutboxListSeenCounts=window.__scoutboxListSeenCounts||{};
+  if(!(key in window.__scoutboxListSeenCounts)){window.__scoutboxListSeenCounts[key]=counts[key]||0;return}
+  const before=Number(window.__scoutboxListSeenCounts[key]||0),now=Number(counts[key]||0);
+  window.__scoutboxListSeenCounts[key]=now;
+  if(now>before)scoutboxRefreshVisibleListForNewItems(key);
+}
+async function refreshUnreadCounts(){try{const r=await fetch('{% url "attention_counts" %}',{cache:'no-store',headers:{'X-Requested-With':'fetch'}});if(!r.ok)return;const d=await r.json();if(!d.ok)return;const badgeText=n=>n>100?'99+':String(n);const keys=['opportunities','hidden_leads','applications','contacts'];keys.forEach(k=>{const n=Number(d[k]||0);document.querySelectorAll('[data-unread-badge="'+k+'"]').forEach(el=>{el.textContent=badgeText(n);el.hidden=n<=0;el.closest('a')?.classList.toggle('has-unread',n>0);const label=el.dataset.badgeTooltip;if(label)el.title=n+' '+label.toLowerCase()});document.querySelectorAll('[data-unread-inline="'+k+'"]').forEach(el=>el.textContent=n)});const total=Number(d.total ?? (Number(d.opportunities||0)+Number(d.hidden_leads||0)));document.querySelectorAll('[data-unread-badge="total"]').forEach(el=>{el.textContent=badgeText(total);el.hidden=total<=0});const errors=Number(d.errors||0);document.querySelectorAll('[data-error-badge]').forEach(el=>{el.textContent=badgeText(errors);el.hidden=errors<=0;const link=el.closest('a');if(link&&(link.dataset.navLabel||'').toLowerCase()==='dashboard')link.classList.toggle('has-unread',errors>0)});const alerts=Number(d.alerts??errors),warnings=Number(d.warnings||0);document.querySelectorAll('[data-alert-badge]').forEach(el=>{el.textContent=badgeText(alerts);el.hidden=alerts<=0;el.classList.toggle('attention-errors',errors>0);el.classList.toggle('attention-warnings',errors<=0&&warnings>0)});renderAttentionRecent(d);renderAttentionAlerts(d);scoutboxMaybeRefreshVisibleListAfterBadgeUpdate(d)}catch(e){}}
+window.refreshUnreadCounts=refreshUnreadCounts;
+function splitTrailingOptionCount(text){
+  const full=String(text||'').trim(),match=full.match(/^(.*?)(?:\s+\(([\d,]+)\))$/);
+  return match?{label:String(match[1]||'').trim(),count:String(match[2]||'').trim(),full}:{label:full,count:'',full};
+}
+function initSearchableSelects(){
+  document.querySelectorAll('select.searchable-select:not([data-searchable-ready])').forEach(select=>{
+    select.dataset.searchableReady='1';const wrap=document.createElement('div');wrap.className='searchable-select-wrap';if(select.classList.contains('focus-filter-select'))wrap.classList.add('focus-filter-wrap');const input=document.createElement('input');input.type='search';input.className='searchable-select-input';input.autocomplete='off';input.spellcheck=false;input.placeholder=select.dataset.searchPlaceholder||'Search…';input.setAttribute('aria-label',select.getAttribute('aria-label')||select.title||'Search choices');const arrow=document.createElement('span');arrow.className='searchable-select-arrow';arrow.setAttribute('aria-hidden','true');const panel=document.createElement('div');panel.className='searchable-select-panel';panel.hidden=true;
+    const options=[...select.options];const cleanEditableLabel=text=>String(text||'').trim().replace(/\s+\([\d,]+\)\s*$/,'');function chosenLabel(){return cleanEditableLabel(select.options[select.selectedIndex]?.textContent||'')}function sync(){input.value=chosenLabel();panel.querySelectorAll('.searchable-select-option').forEach(b=>{const selected=b.dataset.value===select.value;b.classList.toggle('selected',selected);const check=b.querySelector('.searchable-select-check');if(check)check.style.visibility=selected?'visible':'hidden'})}function filter(){const q=input.value.trim().toLowerCase();panel.querySelectorAll('button').forEach(b=>b.hidden=!!q&&!(b.dataset.label||'').includes(q))}function open(){panel.hidden=false;wrap.classList.add('open');filter()}function close(){panel.hidden=true;wrap.classList.remove('open');sync()}
+    options.forEach(opt=>{const b=document.createElement('button');b.type='button';b.className='searchable-select-option';b.dataset.value=opt.value;const parsed=splitTrailingOptionCount(opt.textContent||'');b.dataset.label=parsed.full.toLowerCase();b.title=parsed.full;const check=document.createElement('span');check.className='searchable-select-check';check.textContent='✓';check.setAttribute('aria-hidden','true');const parts=[check];const iconKey=String(opt.dataset.icon||opt.dataset.providerType||'').trim();if(iconKey){const icon=document.createElement('span');icon.className='provider-kind-icon provider-kind-'+iconKey;icon.setAttribute('aria-hidden','true');const tmpl=document.getElementById('provider-icon-'+iconKey+'-template');if(tmpl)icon.innerHTML=tmpl.innerHTML;parts.push(icon)}const label=document.createElement('span');label.className='searchable-select-label';label.textContent=parsed.label;label.title=parsed.label;parts.push(label);if(parsed.count){const count=document.createElement('span');count.className='searchable-select-count';count.textContent='('+parsed.count+')';count.setAttribute('aria-label',parsed.count+' items');parts.push(count)}b.append(...parts);b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>{select.value=opt.value;sync();close();select.dispatchEvent(new Event('change',{bubbles:true}))});panel.appendChild(b)});select.parentNode.insertBefore(wrap,select);wrap.append(input,arrow,panel,select);select.classList.add('searchable-select-native');sync();input.addEventListener('focus',()=>{input.select();open()});input.addEventListener('click',open);input.addEventListener('input',()=>{open();filter()});input.addEventListener('keydown',e=>{if(e.key==='Escape'){close();input.blur()}else if(e.key==='Enter'){const first=[...panel.querySelectorAll('button:not([hidden])')][0];if(first){e.preventDefault();first.click()}}});document.addEventListener('click',e=>{if(!wrap.contains(e.target))close()});
+  });
+}
+function initScoutMultilineTooltips(){
+  if(window.__scoutMultilineTooltipReady)return;window.__scoutMultilineTooltipReady=true;
+  let tip=null,owner=null;
+  function ensure(){if(tip)return tip;tip=document.createElement('div');tip.className='scout-floating-tooltip';tip.hidden=true;tip.setAttribute('role','tooltip');document.body.appendChild(tip);return tip}
+  function hide(el){if(el&&owner&&el!==owner)return;const t=ensure();t.hidden=true;owner=null}
+  function show(el){if(!el)return;const text=String(el.dataset.tooltip||'').trim();if(!text){hide();return}const t=ensure();owner=el;t.textContent=text;t.hidden=false;t.style.visibility='hidden';t.style.left='0px';t.style.top='0px';const r=el.getBoundingClientRect(),tr=t.getBoundingClientRect(),gap=7,pad=8;let left=r.left+r.width/2-tr.width/2;left=Math.max(pad,Math.min(left,window.innerWidth-tr.width-pad));let top=r.bottom+gap;if(top+tr.height>window.innerHeight-pad)top=r.top-tr.height-gap;if(top<pad)top=Math.max(pad,Math.min(window.innerHeight-tr.height-pad,r.bottom+gap));t.style.left=Math.round(left)+'px';t.style.top=Math.round(top)+'px';t.style.visibility='visible'}
+  document.addEventListener('pointerover',e=>{const el=e.target.closest?.('.scout-multiline-tooltip[data-tooltip]');if(el)show(el)});
+  document.addEventListener('pointerout',e=>{const el=e.target.closest?.('.scout-multiline-tooltip[data-tooltip]');if(el&&!el.contains(e.relatedTarget))hide(el)});
+  document.addEventListener('focusin',e=>{const el=e.target.closest?.('.scout-multiline-tooltip[data-tooltip]');if(el)show(el)});
+  document.addEventListener('focusout',e=>{const el=e.target.closest?.('.scout-multiline-tooltip[data-tooltip]');if(el)hide(el)});
+  window.addEventListener('scroll',()=>hide(),{passive:true});window.addEventListener('resize',()=>{if(owner)show(owner)});
+}
+function initViewportTableScrollbar(){
+  let proxy=document.getElementById('table-scroll-proxy');
+  if(!proxy){proxy=document.createElement('div');proxy.id='table-scroll-proxy';proxy.className='table-scroll-proxy';proxy.setAttribute('aria-label','Horizontal table scrollbar');const inner=document.createElement('div');inner.className='table-scroll-proxy-inner';proxy.appendChild(inner);document.body.appendChild(proxy)}
+  const inner=proxy.firstElementChild;let active=null;let syncing=false;
+  function candidates(){return [...document.querySelectorAll('.table-wrap')].filter(w=>{const table=w.querySelector('table');if(!table)return false;const r=w.getBoundingClientRect();return w.scrollWidth>w.clientWidth+2&&r.bottom>0&&r.top<window.innerHeight&&r.width>80})}
+  function choose(){
+    const rows=candidates();let best=null,bestSpan=-1;
+    rows.forEach(w=>{const r=w.getBoundingClientRect();const span=Math.max(0,Math.min(r.bottom,window.innerHeight)-Math.max(r.top,0));if(span>bestSpan){best=w;bestSpan=span}});
+    return best;
+  }
+  function update(){
+    const wrap=choose();
+    if(!wrap){active=null;proxy.classList.remove('visible');return}
+    const r=wrap.getBoundingClientRect();
+    // When the real scrollbar is already inside the viewport, do not duplicate it.
+    if(r.bottom<=window.innerHeight-2){active=wrap;proxy.classList.remove('visible');return}
+    active=wrap;const left=Math.max(0,r.left),right=Math.min(window.innerWidth,r.right);const width=Math.max(0,right-left);
+    if(width<80){proxy.classList.remove('visible');return}
+    proxy.style.left=left+'px';proxy.style.width=width+'px';proxy.style.bottom='0px';inner.style.width=active.scrollWidth+'px';
+    syncing=true;proxy.scrollLeft=active.scrollLeft;syncing=false;proxy.classList.add('visible');
+  }
+  proxy.onscroll=()=>{if(!active||syncing)return;syncing=true;active.scrollLeft=proxy.scrollLeft;syncing=false};
+  document.querySelectorAll('.table-wrap').forEach(w=>{if(w.dataset.proxyScrollBound)return;w.dataset.proxyScrollBound='1';w.addEventListener('scroll',()=>{if(active===w&&!syncing){syncing=true;proxy.scrollLeft=w.scrollLeft;syncing=false}})});
+  window.__scoutboxUpdateTableScrollbar=update;update();
+}
+function initCountryPickers(){
+  document.querySelectorAll('select.country-picker:not([data-country-enhanced])').forEach(select=>{
+    select.dataset.countryEnhanced='1';
+    const wrap=document.createElement('div');wrap.className='country-combobox';
+    const input=document.createElement('input');input.type='text';input.className='country-search-input';input.autocomplete='off';input.spellcheck=false;input.setAttribute('role','combobox');input.setAttribute('aria-expanded','false');input.placeholder='Search country…';
+    const panel=document.createElement('div');panel.className='country-options-popover';panel.hidden=true;panel.setAttribute('role','listbox');
+    const options=[...select.options];
+    function labelFor(opt){return (opt.textContent||'').trim()}
+    function editableCountryLabel(opt){return labelFor(opt).replace(/\s+\([\d,]+\)\s*$/,'')}
+    function sync(){const opt=select.options[select.selectedIndex];input.value=opt?editableCountryLabel(opt):''}
+    function filter(){const q=input.value.trim().toLowerCase();let visible=0;panel.querySelectorAll('[data-country-value]').forEach(btn=>{const on=!q||(btn.dataset.countryLabel||'').includes(q);btn.hidden=!on;if(on)visible++});return visible}
+    function open(){panel.hidden=false;input.setAttribute('aria-expanded','true');filter()}
+    function close(){panel.hidden=true;input.setAttribute('aria-expanded','false');sync()}
+    options.forEach(opt=>{const btn=document.createElement('button');btn.type='button';btn.className='country-option';btn.dataset.countryValue=opt.value;const parsed=splitTrailingOptionCount(labelFor(opt));btn.dataset.countryLabel=parsed.full.toLowerCase();btn.title=parsed.full;const label=document.createElement('span');label.className='country-option-label';label.textContent=parsed.label;label.title=parsed.label;btn.appendChild(label);if(parsed.count){const count=document.createElement('span');count.className='country-option-count';count.textContent='('+parsed.count+')';count.setAttribute('aria-label',parsed.count+' items');btn.appendChild(count)}btn.setAttribute('role','option');btn.addEventListener('mousedown',e=>e.preventDefault());btn.addEventListener('click',()=>{select.value=opt.value;select.dispatchEvent(new Event('change',{bubbles:true}));sync();close()});panel.appendChild(btn)});
+    select.parentNode.insertBefore(wrap,select);wrap.append(input,panel,select);select.classList.add('country-native-hidden');sync();
+    input.addEventListener('focus',()=>{input.select();open()});input.addEventListener('click',open);input.addEventListener('input',()=>{open();filter()});
+    input.addEventListener('keydown',e=>{if(e.key==='Escape'){close();input.blur();return}if(e.key==='ArrowDown'){e.preventDefault();open();const first=[...panel.querySelectorAll('.country-option:not([hidden])')][0];first?.focus();return}if(e.key==='Enter'){const first=[...panel.querySelectorAll('.country-option:not([hidden])')][0];if(first){e.preventDefault();first.click()}}});
+    panel.addEventListener('keydown',e=>{const rows=[...panel.querySelectorAll('.country-option:not([hidden])')],i=rows.indexOf(document.activeElement);if(e.key==='ArrowDown'&&i>=0){e.preventDefault();rows[Math.min(rows.length-1,i+1)]?.focus()}else if(e.key==='ArrowUp'){e.preventDefault();if(i<=0)input.focus();else rows[i-1]?.focus()}else if(e.key==='Escape'){e.preventDefault();close();input.focus()}});
+    document.addEventListener('click',e=>{if(!wrap.contains(e.target))close()});
+  });
+}
+function initToolbarSelectFocusRelease(){
+  if(window.__scoutboxToolbarSelectFocusReleaseReady)return;
+  window.__scoutboxToolbarSelectFocusReleaseReady=true;
+  // Native transparent selects keep :focus after their popup is dismissed with a mouse.
+  // Release only pointer-driven outside focus; keyboard tab focus remains visible/accessibile.
+  document.addEventListener('pointerdown',e=>{
+    const active=document.activeElement;
+    if(!(active instanceof HTMLSelectElement)||!active.closest('.toolbar-select-button'))return;
+    const owner=active.closest('.toolbar-select-button');
+    if(owner&&!owner.contains(e.target))active.blur();
+  },true);
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Escape')return;
+    const active=document.activeElement;
+    if(active instanceof HTMLSelectElement&&active.closest('.toolbar-select-button'))active.blur();
+  });
+}
+function alignTableSearchFields(root=document){
+  root.querySelectorAll('[data-align-search-table]').forEach(input=>{const table=document.getElementById(input.dataset.alignSearchTable);if(!table||table.offsetParent===null)return;const idx=Number(input.dataset.alignSearchCol||0),th=table.tHead?.rows?.[0]?.cells?.[idx];if(!th)return;const r=input.getBoundingClientRect(),t=th.getBoundingClientRect(),width=Math.max(180,Math.round(t.right-r.left));input.style.setProperty('width',width+'px','important');input.style.setProperty('max-width',width+'px','important');input.style.setProperty('flex','0 0 '+width+'px','important')})
+}
+function initSharedDateRangeFilters(root=document){
+  const pad=n=>String(n).padStart(2,'0'),fmt=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  const parse=value=>{const m=String(value||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(!m)return null;const day=Number(m[1]),month=Number(m[2]),year=Number(m[3]),date=new Date(year,month-1,day);if(date.getFullYear()!==year||date.getMonth()!==month-1||date.getDate()!==day)return null;return{date,key:year*10000+month*100+day,iso:m[3]+'-'+m[2]+'-'+m[1]}};
+  const maxDate=()=>{const date=new Date();date.setDate(date.getDate()+1);return{date,key:date.getFullYear()*10000+(date.getMonth()+1)*100+date.getDate(),iso:date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate())}};
+  function validatePair(from,to){
+    const fromValue=(from?.value||'').trim(),toValue=(to?.value||'').trim(),state={hasAny:Boolean(fromValue||toValue),complete:Boolean(fromValue&&toValue),valid:false,reason:'',badFrom:false,badTo:false};
+    if(!state.hasAny){state.reason='Enter both From and To dates';return state}
+    if(!state.complete){state.reason='Enter both From and To dates';state.badFrom=!fromValue;state.badTo=!toValue;return state}
+    const fromDate=parse(fromValue),toDate=parse(toValue),limit=maxDate();
+    if(!fromDate||!toDate){state.reason='Enter valid dates in dd/mm/yyyy format';state.badFrom=!fromDate;state.badTo=!toDate;return state}
+    if(fromDate.key>=toDate.key){state.reason='From must be earlier than To';state.badFrom=true;state.badTo=true;return state}
+    if(fromDate.key>limit.key||toDate.key>limit.key){state.reason='Dates cannot be later than tomorrow';state.badFrom=fromDate.key>limit.key;state.badTo=toDate.key>limit.key;return state}
+    state.valid=true;return state
+  }
+  function paintValidation(from,to,apply,{active=false,emptyAllowed=false}={}){
+    const state=validatePair(from,to);
+    [[from,state.badFrom],[to,state.badTo]].forEach(([input,bad])=>{if(!input)return;input.classList.toggle('date-range-invalid',Boolean(bad));if(bad)input.setAttribute('aria-invalid','true');else input.removeAttribute('aria-invalid')});
+    if(apply){apply.classList.toggle('active',Boolean(active));apply.setAttribute('aria-pressed',active?'true':'false');apply.disabled=!state.valid;apply.setAttribute('aria-disabled',state.valid?'false':'true');apply.title=state.valid?(active?'Date range filter active — click to clear if unchanged':'Apply date filter'):state.reason}
+    return state
+  }
+  function guardSubmit(form,from,to){form.addEventListener('submit',e=>{const state=validatePair(from,to);if(state.hasAny&&!state.valid){e.preventDefault();const apply=form.querySelector('.history-range-apply,button[type=submit],button:not([type])');paintValidation(from,to,apply,{active:state.hasAny});from?.reportValidity?.();to?.reportValidity?.()}})}
+  root.querySelectorAll('[data-date-picker]:not([data-date-picker-ready])').forEach(btn=>{btn.dataset.datePickerReady='1';btn.addEventListener('click',()=>{const wrap=btn.closest('.date-input-wrap'),text=wrap?.querySelector('input[type=text],input:not([type])');if(!text)return;let picker=wrap.querySelector('input[type=date].scoutbox-date-picker-native');if(!picker){picker=document.createElement('input');picker.type='date';picker.className='scoutbox-date-picker-native';picker.tabIndex=-1;picker.style.cssText='position:absolute;opacity:0;pointer-events:none;width:1px;height:1px';wrap.appendChild(picker);picker.addEventListener('change',()=>{if(!picker.value)return;const [y,m,d]=picker.value.split('-');text.value=d+'/'+m+'/'+y;text.dispatchEvent(new Event('input',{bubbles:true}));text.dispatchEvent(new Event('change',{bubbles:true}))})}const parsed=parse(text.value);picker.value=parsed?.iso||'';picker.max=maxDate().iso;if(picker.showPicker)picker.showPicker();else picker.click()})});
+  root.querySelectorAll('select[data-date-range-select]:not([data-date-range-ready])').forEach(select=>{
+    select.dataset.dateRangeReady='1';const form=select.form;if(!form)return;const from=form.querySelector('input[name="from"][data-date-range-input]'),to=form.querySelector('input[name="to"][data-date-range-input]'),apply=form.querySelector('.history-range-apply');
+    const initial={period:select.value,from:from?.value||'',to:to?.value||''};
+    const datesFor=value=>{if(value==='all')return['',''];const days={"24h":1,"3d":3,"7d":7,"14d":14,"30d":30}[value];if(!days)return[from?.value||'',to?.value||''];const end=new Date(),start=new Date(end);start.setDate(start.getDate()-days);return[fmt(start),fmt(end)]};
+    const sync=()=>{const state=validatePair(from,to),active=select.value!=='all'||state.hasAny;paintValidation(from,to,apply,{active})};
+    select.addEventListener('change',()=>{if(select.value!=='custom'){const dates=datesFor(select.value);if(from)from.value=dates[0];if(to)to.value=dates[1];sync();if(form.requestSubmit)form.requestSubmit();else form.submit()}});
+    [from,to].filter(Boolean).forEach(input=>input.addEventListener('input',()=>{select.value='custom';sync()}));
+    apply?.addEventListener('click',e=>{const unchanged=select.value===initial.period&&(from?.value||'')===initial.from&&(to?.value||'')===initial.to;const active=initial.period!=='all'||Boolean(initial.from||initial.to);if(active&&unchanged){e.preventDefault();select.value='all';if(from)from.value='';if(to)to.value='';apply.disabled=false;if(form.requestSubmit)form.requestSubmit();else form.submit()}});guardSubmit(form,from,to);sync();
+  });
+  root.querySelectorAll('form.resource-date-form,form.date-range-inline').forEach(form=>{if(form.dataset.dateToggleReady)return;form.dataset.dateToggleReady='1';const from=form.querySelector('input[name=from]'),to=form.querySelector('input[name=to]'),period=form.querySelector('input[name=period]'),apply=form.querySelector('button[type=submit],button:not([type])');const initial={from:from?.value||'',to:to?.value||'',period:period?.value||'all'};const sync=()=>{const state=validatePair(from,to);paintValidation(from,to,apply,{active:state.hasAny})};[from,to].filter(Boolean).forEach(input=>input.addEventListener('input',()=>{if(period)period.value='custom';sync()}));apply?.addEventListener('click',e=>{const unchanged=(from?.value||'')===initial.from&&(to?.value||'')===initial.to;const active=Boolean(initial.from||initial.to);if(active&&unchanged){e.preventDefault();if(from)from.value='';if(to)to.value='';if(period)period.value='all';apply.disabled=false;if(form.requestSubmit)form.requestSubmit();else form.submit()}});guardSubmit(form,from,to);sync()});
+}
+async function refreshFacebookPageBadge(){try{const r=await fetch('{% url "attention_counts" %}',{cache:'no-store',headers:{'X-Requested-With':'fetch'}});if(!r.ok)return;const d=await r.json(),n=Number(d.facebook_pages||0);document.querySelectorAll('[data-unread-badge="facebook_pages"]').forEach(el=>{el.textContent=n>100?'99+':String(n);el.hidden=n<=0;el.closest('a')?.classList.toggle('has-unread',n>0);el.title=n+' new Facebook Page'+(n===1?'':'s')})}catch(e){}}
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('.attention-action').forEach(action=>{action.addEventListener('click',e=>{if(e.target.closest('a,button')&&e.target!==action)return;e.stopPropagation();const was=action.classList.contains('is-open');document.querySelectorAll('.attention-action.is-open').forEach(x=>x.classList.remove('is-open'));if(!was)action.classList.add('is-open')});action.querySelector('.attention-popover')?.addEventListener('click',e=>e.stopPropagation())});
+  document.addEventListener('click',()=>document.querySelectorAll('.attention-action.is-open').forEach(x=>x.classList.remove('is-open')));document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.attention-action.is-open').forEach(x=>x.classList.remove('is-open'))});
+  updateGlobalHeaderClock();setInterval(updateGlobalHeaderClock,1000);refreshUnreadCounts();refreshFacebookPageBadge();setInterval(refreshUnreadCounts,60000);setInterval(refreshFacebookPageBadge,60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshUnreadCounts();refreshFacebookPageBadge()}});window.addEventListener('pageshow',()=>{refreshUnreadCounts();refreshFacebookPageBadge()});
+  try{const saved=JSON.parse(sessionStorage.getItem('scoutbox-pager-scroll')||'null');if(saved&&saved.path===location.pathname&&Date.now()-Number(saved.at||0)<15000&&/[?&]page=/.test(location.search)){sessionStorage.removeItem('scoutbox-pager-scroll');requestAnimationFrame(()=>window.scrollTo({top:Math.max(0,Math.min(Number(saved.y||0),document.documentElement.scrollHeight-window.innerHeight)),behavior:'auto'}))}}catch(e){}
+  document.querySelectorAll('.server-pager a[href]').forEach(a=>a.addEventListener('click',()=>{try{sessionStorage.setItem('scoutbox-pager-scroll',JSON.stringify({path:location.pathname,y:window.scrollY,at:Date.now()}))}catch(e){}}));
+  document.addEventListener('submit',e=>{const form=e.target;if(form?.matches?.('form[method="get"],form:not([method])')&&form.querySelector('input[type=search],select,[data-list-filter]'))listNavigationBusy()});
+  document.addEventListener('change',e=>{const el=e.target;if(el?.matches?.('.country-picker,.focus-filter-select,[data-list-filter],[data-server-filter]')&&!el.closest('form[data-async-list-search]'))listNavigationBusy()});
+  document.addEventListener('click',e=>{const a=e.target.closest?.('.server-pager a[href],a[data-list-navigation]');if(a)listNavigationBusy()});
+  const side=document.querySelector('.nav');if(side){const saved=sessionStorage.getItem('sidebar-nav-scroll');if(saved)side.scrollTop=parseInt(saved,10)||0;side.querySelectorAll('a[href]').forEach(a=>a.addEventListener('click',()=>sessionStorage.setItem('sidebar-nav-scroll',String(side.scrollTop))));}
+  ScoutChat.load();const i=document.getElementById('scout-chat-input');if(i)i.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ScoutChat.send()}});initTabs();document.querySelectorAll('[data-tab-button]').forEach(b=>b.addEventListener('click',()=>requestAnimationFrame(()=>alignTableSearchFields())));
+  initListTables();alignTableSearchFields();initTokenInputs();initMasterChecks();initCountryPickers();initSearchableSelects();initScoutMultilineTooltips();initMultiSelectFilters();initAsyncListSearches();initSharedDateRangeFilters();initViewportTableScrollbar();initToolbarSelectFocusRelease();
+  document.querySelectorAll('[data-live-filter]').forEach(input=>input.addEventListener('input',()=>liveFilter(input,input.dataset.liveFilter)));
+  window.addEventListener('scroll',()=>window.__scoutboxUpdateTableScrollbar?.(),{passive:true});window.addEventListener('resize',()=>{window.__scoutboxUpdateTableScrollbar?.();alignTableSearchFields()});
+  document.addEventListener('scoutbox:list-updated',()=>{requestAnimationFrame(()=>{alignTableSearchFields();initSharedDateRangeFilters();initViewportTableScrollbar();window.__scoutboxUpdateTableScrollbar?.()})});
+});
+</script>{% block scripts %}{% endblock %}</body></html>
