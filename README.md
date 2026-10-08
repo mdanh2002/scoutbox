@@ -1,6 +1,6 @@
 # ScoutBox
 
-A self-hosted web application that finds niche engineering vacancies and companies worth contacting. A candidate profile and a set of narrow campaigns steer searches across public web engines, job boards, ATS career pages, engineering forums, social sources and SearchApi. Everything that comes back is fetched, assessed by a local or cloud LLM, and filed as an **Opportunity** (a concrete vacancy), a **Hidden Lead** (a company with relevant activity but no advertised role), an **Address Book** contact or a **Facebook Page**.  
+A self-hosted web application that finds niche engineering vacancies and companies worth contacting. A candidate profile and a set of narrow campaigns steer searches across public web engines, job boards, ATS career pages, engineering forums, social sources and SearchApi. Everything that comes back is fetched, assessed by a local or cloud LLM, and filed as an **Opportunity** (a concrete vacancy), a **Hidden Lead** (a company with relevant activity but no advertised role), an **Address Book** contact or a **Facebook Page**.
 
 ## Features
 
@@ -74,4 +74,4 @@ The **About** page inside the portal lists further ScoutBox-specific inspection 
 
 ## License
 
-To be announced with the public release.
+ScoutBox is open source and free to use, modify and redistribute under the [GNU General Public License v3.0](LICENSE). Derivative works must be released under the same license.
